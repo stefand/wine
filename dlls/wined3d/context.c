@@ -1511,6 +1511,12 @@ struct wined3d_context *context_create(struct wined3d_swapchain *swapchain,
         goto out;
     }
 
+    ret->current_fb.render_targets = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY,
+            sizeof(*ret->current_fb.render_targets) * gl_info->limits.buffers);
+    ret->current_fb.rt_size = gl_info->limits.buffers;
+    if (!ret->current_fb.render_targets)
+        goto out;
+
     /* Initialize the texture unit mapping to a 1:1 mapping */
     for (s = 0; s < MAX_COMBINED_SAMPLERS; ++s)
     {
@@ -1840,6 +1846,7 @@ out:
     if (hdc) wined3d_release_dc(swapchain->win_handle, hdc);
     device->shader_backend->shader_free_context_data(ret);
     device->adapter->fragment_pipe->free_context_data(ret);
+    HeapFree(GetProcessHeap(), 0, ret->current_fb.render_targets);
     HeapFree(GetProcessHeap(), 0, ret->free_event_queries);
     HeapFree(GetProcessHeap(), 0, ret->free_occlusion_queries);
     HeapFree(GetProcessHeap(), 0, ret->free_timestamp_queries);
@@ -1874,6 +1881,7 @@ void context_destroy(struct wined3d_device *device, struct wined3d_context *cont
 
     device->shader_backend->shader_free_context_data(context);
     device->adapter->fragment_pipe->free_context_data(context);
+    HeapFree(GetProcessHeap(), 0, context->current_fb.render_targets);
     HeapFree(GetProcessHeap(), 0, context->draw_buffers);
     HeapFree(GetProcessHeap(), 0, context->blit_targets);
     device_context_remove(device, context);
@@ -2385,7 +2393,7 @@ BOOL context_apply_clear_state(struct wined3d_context *context, const struct win
     DWORD rt_mask = 0, *cur_mask;
     UINT i;
 
-    if (isStateDirty(context, STATE_FRAMEBUFFER) || fb != &device->fb
+    if (isStateDirty(context, STATE_FRAMEBUFFER) || !wined3d_fb_equal(fb, &context->current_fb)
             || rt_count != context->gl_info->limits.buffers)
     {
         if (!context_validate_rt_config(rt_count, rts, dsv))
@@ -2430,6 +2438,8 @@ BOOL context_apply_clear_state(struct wined3d_context *context, const struct win
             rt_mask = context_generate_rt_mask_no_fbo(device,
                     rt_count ? wined3d_rendertarget_view_get_surface(rts[0]) : NULL);
         }
+
+        wined3d_fb_copy(&context->current_fb, fb);
     }
     else if (wined3d_settings.offscreen_rendering_mode == ORM_FBO
             && (!rt_count || wined3d_resource_is_offscreen(rts[0]->resource)))
@@ -2488,7 +2498,7 @@ BOOL context_apply_clear_state(struct wined3d_context *context, const struct win
 static DWORD find_draw_buffers_mask(const struct wined3d_context *context, const struct wined3d_device *device)
 {
     const struct wined3d_state *state = &device->state;
-    struct wined3d_rendertarget_view **rts = state->fb->render_targets;
+    struct wined3d_rendertarget_view **rts = state->fb.render_targets;
     struct wined3d_shader *ps = state->shader[WINED3D_SHADER_TYPE_PIXEL];
     DWORD rt_mask, rt_mask_bits;
     unsigned int i;
@@ -2518,7 +2528,7 @@ static DWORD find_draw_buffers_mask(const struct wined3d_context *context, const
 void context_state_fb(struct wined3d_context *context, const struct wined3d_state *state, DWORD state_id)
 {
     const struct wined3d_device *device = context->swapchain->device;
-    const struct wined3d_fb_state *fb = state->fb;
+    const struct wined3d_fb_state *fb = &state->fb;
     DWORD rt_mask = find_draw_buffers_mask(context, device);
     DWORD *cur_mask;
 
@@ -2550,6 +2560,8 @@ void context_state_fb(struct wined3d_context *context, const struct wined3d_stat
         context_apply_draw_buffers(context, rt_mask);
         *cur_mask = rt_mask;
     }
+
+    wined3d_fb_copy(&context->current_fb, &state->fb);
 }
 
 static void context_map_stage(struct wined3d_context *context, DWORD stage, DWORD unit)
@@ -3193,7 +3205,7 @@ BOOL context_apply_draw_state(struct wined3d_context *context, struct wined3d_de
 {
     const struct wined3d_state *state = &device->state;
     const struct StateEntry *state_table = context->state_table;
-    const struct wined3d_fb_state *fb = state->fb;
+    const struct wined3d_fb_state *fb = &state->fb;
     unsigned int i;
     WORD map;
 
