@@ -4163,6 +4163,7 @@ static HRESULT surface_blt_special(struct wined3d_surface *dst_surface, const RE
     struct wined3d_device *device = dst_surface->resource.device;
     const struct wined3d_gl_info *gl_info = &device->adapter->gl_info;
     struct wined3d_swapchain *src_swapchain, *dst_swapchain;
+    const struct wined3d_fb_state *fb = &device->state.fb;
 
     TRACE("dst_surface %p, dst_rect %s, src_surface %p, src_rect %s, flags %#x, blt_fx %p, filter %s.\n",
             dst_surface, wine_dbgstr_rect(dst_rect), src_surface, wine_dbgstr_rect(src_rect),
@@ -4194,8 +4195,8 @@ static HRESULT surface_blt_special(struct wined3d_surface *dst_surface, const RE
 
     /* Early sort out of cases where no render target is used */
     if (!dst_swapchain && !src_swapchain
-            && src_surface != device->fb.render_targets[0]
-            && dst_surface != device->fb.render_targets[0])
+            && src_surface != fb->render_targets[0]
+            && dst_surface != fb->render_targets[0])
     {
         TRACE("No surface is render target, not using hardware blit.\n");
         return WINED3DERR_INVALIDCALL;
@@ -4224,16 +4225,16 @@ static HRESULT surface_blt_special(struct wined3d_surface *dst_surface, const RE
     if (dst_swapchain)
     {
         /* Handled with regular texture -> swapchain blit */
-        if (src_surface == device->fb.render_targets[0])
+        if (src_surface == fb->render_targets[0])
             TRACE("Blit from active render target to a swapchain\n");
     }
-    else if (src_swapchain && dst_surface == device->fb.render_targets[0])
+    else if (src_swapchain && dst_surface == fb->render_targets[0])
     {
         FIXME("Implement blit from a swapchain to the active render target\n");
         return WINED3DERR_INVALIDCALL;
     }
 
-    if ((src_swapchain || src_surface == device->fb.render_targets[0]) && !dst_swapchain)
+    if ((src_swapchain || src_surface == fb->render_targets[0]) && !dst_swapchain)
     {
         /* Blit from render target to texture */
         BOOL stretchx;
