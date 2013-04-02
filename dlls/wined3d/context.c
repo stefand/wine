@@ -2777,7 +2777,7 @@ void context_stream_info_from_declaration(struct wined3d_context *context,
          * (or rather offsets bigger than the vbo, because the pointer is unsigned), so use system memory
          * sources. In most sane cases the pointer - offset will still be > 0, otherwise it will wrap
          * around to some big value. Hope that with the indices, the driver wraps it back internally. If
-         * not, drawStridedSlow is needed, including a vertex buffer path. */
+         * not, draw_strided_slow is needed, including a vertex buffer path. */
         if (state->load_base_vertex_index < 0)
         {
             WARN_(d3d_perf)("load_base_vertex_index is < 0 (%d), not using VBOs.\n",
@@ -2892,7 +2892,7 @@ static void context_update_stream_info(struct wined3d_context *context, const st
     {
         if (state->vertex_declaration->half_float_conv_needed && !stream_info->all_vbo)
         {
-            TRACE("Using drawStridedSlow with vertex shaders for FLOAT16 conversion.\n");
+            TRACE("Using draw_strided_slow with vertex shaders for FLOAT16 conversion.\n");
             context->use_immediate_mode_draw = TRUE;
         }
         else
@@ -2964,9 +2964,9 @@ static void context_preload_textures(struct wined3d_context *context, const stru
 }
 
 /* Context activation is done by the caller. */
-BOOL context_apply_draw_state(struct wined3d_context *context, struct wined3d_device *device)
+BOOL context_apply_draw_state(struct wined3d_context *context, const struct wined3d_device *device,
+        const struct wined3d_state *state)
 {
-    const struct wined3d_state *state = &device->state;
     const struct StateEntry *state_table = context->state_table;
     const struct wined3d_fb_state *fb = &state->fb;
     unsigned int i;
