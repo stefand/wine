@@ -410,6 +410,12 @@ ULONG CDECL wined3d_volume_decref(struct wined3d_volume *volume)
 
     if (!refcount)
     {
+        if (wined3d_settings.cs_multithreaded)
+        {
+            FIXME("Waiting for cs.\n");
+            volume->resource.device->cs->ops->finish(volume->resource.device->cs);
+        }
+
         resource_cleanup(&volume->resource);
         volume->resource.parent_ops->wined3d_object_destroyed(volume->resource.parent);
         HeapFree(GetProcessHeap(), 0, volume);
