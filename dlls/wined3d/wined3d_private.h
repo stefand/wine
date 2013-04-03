@@ -2911,6 +2911,7 @@ struct wined3d_cs_ops
 {
     void *(*require_space)(struct wined3d_cs *cs, size_t size);
     void (*submit)(struct wined3d_cs *cs);
+    void (*finish)(struct wined3d_cs *cs);
     void (*push_constants)(struct wined3d_cs *cs, enum wined3d_push_constants p,
             unsigned int start_idx, unsigned int count, const void *constants);
 };
