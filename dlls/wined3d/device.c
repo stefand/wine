@@ -2628,6 +2628,13 @@ static HRESULT process_vertices_strided(const struct wined3d_device *device, DWO
         return hr;
     }
 
+    if (wined3d_settings.cs_multithreaded)
+    {
+        FIXME("Waiting for cs.\n");
+        wined3d_cs_emit_glfinish(device->cs);
+        device->cs->ops->finish(device->cs);
+    }
+
     wined3d_device_get_transform(device, WINED3D_TS_VIEW, &view_mat);
     wined3d_device_get_transform(device, WINED3D_TS_PROJECTION, &proj_mat);
     wined3d_device_get_transform(device, WINED3D_TS_WORLD_MATRIX(0), &world_mat);
@@ -3390,6 +3397,13 @@ HRESULT CDECL wined3d_device_update_texture(struct wined3d_device *device,
         return WINED3DERR_INVALIDCALL;
     }
 
+    if (wined3d_settings.cs_multithreaded)
+    {
+        FIXME("Waiting for cs.\n");
+        wined3d_cs_emit_glfinish(device->cs);
+        device->cs->ops->finish(device->cs);
+    }
+
     /* Make sure that the destination texture is loaded. */
     context = context_acquire(device, NULL);
     wined3d_texture_load(dst_texture, context, FALSE);
@@ -3628,6 +3642,13 @@ HRESULT CDECL wined3d_device_update_surface(struct wined3d_device *device,
         return WINED3DERR_INVALIDCALL;
     }
 
+    if (wined3d_settings.cs_multithreaded)
+    {
+        FIXME("Waiting for cs.\n");
+        wined3d_cs_emit_glfinish(device->cs);
+        device->cs->ops->finish(device->cs);
+    }
+
     return surface_upload_from_surface(dst_surface, dst_point, src_surface, src_rect);
 }
 
@@ -3644,6 +3665,13 @@ HRESULT CDECL wined3d_device_color_fill(struct wined3d_device *device,
     {
         WARN("Color-fill not allowed on %s surfaces.\n", debug_d3dpool(surface->resource.pool));
         return WINED3DERR_INVALIDCALL;
+    }
+
+    if (wined3d_settings.cs_multithreaded)
+    {
+        FIXME("Waiting for cs.\n");
+        wined3d_cs_emit_glfinish(device->cs);
+        device->cs->ops->finish(device->cs);
     }
 
     if (!rect)
@@ -3667,6 +3695,13 @@ void CDECL wined3d_device_clear_rendertarget_view(struct wined3d_device *device,
     {
         FIXME("Only supported on surface resources\n");
         return;
+    }
+
+    if (wined3d_settings.cs_multithreaded)
+    {
+        FIXME("Waiting for cs.\n");
+        wined3d_cs_emit_glfinish(device->cs);
+        device->cs->ops->finish(device->cs);
     }
 
     SetRect(&rect, 0, 0, resource->width, resource->height);
@@ -4000,6 +4035,13 @@ void CDECL wined3d_device_evict_managed_resources(struct wined3d_device *device)
 
     TRACE("device %p.\n", device);
 
+    if (wined3d_settings.cs_multithreaded)
+    {
+        FIXME("Waiting for cs.\n");
+        wined3d_cs_emit_glfinish(device->cs);
+        device->cs->ops->finish(device->cs);
+    }
+
     LIST_FOR_EACH_ENTRY_SAFE(resource, cursor, &device->resources, struct wined3d_resource, resource_list_entry)
     {
         TRACE("Checking resource %p for eviction.\n", resource);
@@ -4121,6 +4163,13 @@ HRESULT CDECL wined3d_device_reset(struct wined3d_device *device,
     unsigned int i;
 
     TRACE("device %p, swapchain_desc %p, mode %p, callback %p.\n", device, swapchain_desc, mode, callback);
+
+    if (wined3d_settings.cs_multithreaded)
+    {
+        FIXME("Waiting for cs.\n");
+        wined3d_cs_emit_glfinish(device->cs);
+        device->cs->ops->finish(device->cs);
+    }
 
     if (!(swapchain = wined3d_device_get_swapchain(device, 0)))
     {
