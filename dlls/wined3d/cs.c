@@ -65,6 +65,7 @@ enum wined3d_cs_op
     WINED3D_CS_OP_RESET_STATE,
     WINED3D_CS_OP_STATEBLOCK,
     WINED3D_CS_OP_PUSH_CONSTANTS,
+    WINED3D_CS_OP_GLFINISH,
     WINED3D_CS_OP_STOP,
 };
 
@@ -287,6 +288,11 @@ struct wined3d_cs_push_constants
     enum wined3d_push_constants p;
     unsigned int start_idx, count;
     char constants[4];
+};
+
+struct wined3d_cs_finish
+{
+    enum wined3d_cs_op opcode;
 };
 
 /* FIXME: The list synchronization probably isn't particularly fast. */
@@ -1316,6 +1322,29 @@ static UINT wined3d_cs_exec_push_constants(struct wined3d_cs *cs, const void *da
     return op_size;
 }
 
+static UINT wined3d_cs_exec_glfinish(struct wined3d_cs *cs, const void *data)
+{
+    const struct wined3d_cs_finish *op = data;
+    struct wined3d_device *device = cs->device;
+    struct wined3d_context *context;
+
+    context = context_acquire(device, NULL);
+    context->gl_info->gl_ops.gl.p_glFinish();
+    context_release(context);
+
+    return sizeof(*op);
+}
+
+void wined3d_cs_emit_glfinish(struct wined3d_cs *cs)
+{
+    struct wined3d_cs_finish *op;
+
+    op = cs->ops->require_space(cs, sizeof(*op));
+    op->opcode = WINED3D_CS_OP_GLFINISH;
+
+    cs->ops->submit(cs);
+}
+
 static UINT (* const wined3d_cs_op_handlers[])(struct wined3d_cs *cs, const void *data) =
 {
     /* WINED3D_CS_OP_FENCE                      */ wined3d_cs_exec_fence,
@@ -1347,6 +1376,7 @@ static UINT (* const wined3d_cs_op_handlers[])(struct wined3d_cs *cs, const void
     /* WINED3D_CS_OP_RESET_STATE                */ wined3d_cs_exec_reset_state,
     /* WINED3D_CS_OP_STATEBLOCK                 */ wined3d_cs_exec_transfer_stateblock,
     /* WINED3D_CS_OP_PUSH_CONSTANTS             */ wined3d_cs_exec_push_constants,
+    /* WINED3D_CS_OP_GLFINISH                   */ wined3d_cs_exec_glfinish,
 };
 
 static void *wined3d_cs_st_require_space(struct wined3d_cs *cs, size_t size)
