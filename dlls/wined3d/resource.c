@@ -818,6 +818,13 @@ HRESULT wined3d_resource_map2(struct wined3d_resource *resource,
 
     flags = wined3d_resource_sanitize_map_flags(resource, flags);
 
+    if (wined3d_settings.cs_multithreaded)
+    {
+        FIXME("Waiting for cs.\n");
+        wined3d_cs_emit_glfinish(device->cs);
+        device->cs->ops->finish(device->cs);
+    }
+
     if (device->d3d_initialized)
         context = context_acquire(device, NULL);
 
