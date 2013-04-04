@@ -408,10 +408,10 @@ static void swapchain_blit(const struct wined3d_swapchain *swapchain,
 }
 
 static void swapchain_gl_present(struct wined3d_swapchain *swapchain, const RECT *src_rect_in,
-        const RECT *dst_rect_in, const RGNDATA *dirty_region, DWORD flags)
+        const RECT *dst_rect_in, const RGNDATA *dirty_region, DWORD flags,
+        struct wined3d_surface *depth_stencil)
 {
     struct wined3d_surface *back_buffer = swapchain->back_buffers[0];
-    const struct wined3d_fb_state *fb = &swapchain->device->state.fb;
     const struct wined3d_gl_info *gl_info;
     struct wined3d_context *context;
     RECT src_rect, dst_rect;
@@ -562,15 +562,15 @@ static void swapchain_gl_present(struct wined3d_swapchain *swapchain, const RECT
             break;
     }
 
-    if (fb->depth_stencil)
+    if (depth_stencil)
     {
         if (swapchain->desc.flags & WINED3DPRESENTFLAG_DISCARD_DEPTHSTENCIL
-                || fb->depth_stencil->flags & SFLAG_DISCARD)
+                || depth_stencil->flags & SFLAG_DISCARD)
         {
-            surface_modify_ds_location(fb->depth_stencil, WINED3D_LOCATION_DISCARDED,
-                    fb->depth_stencil->resource.width,
-                    fb->depth_stencil->resource.height);
-            if (fb->depth_stencil == swapchain->device->onscreen_depth_stencil)
+            surface_modify_ds_location(depth_stencil, WINED3D_LOCATION_DISCARDED,
+                    depth_stencil->resource.width,
+                    depth_stencil->resource.height);
+            if (depth_stencil == swapchain->device->onscreen_depth_stencil)
             {
                 wined3d_surface_decref(swapchain->device->onscreen_depth_stencil);
                 swapchain->device->onscreen_depth_stencil = NULL;
@@ -631,7 +631,8 @@ void x11_copy_to_screen(const struct wined3d_swapchain *swapchain, const RECT *r
 }
 
 static void swapchain_gdi_present(struct wined3d_swapchain *swapchain, const RECT *src_rect_in,
-        const RECT *dst_rect_in, const RGNDATA *dirty_region, DWORD flags)
+        const RECT *dst_rect_in, const RGNDATA *dirty_region, DWORD flags,
+        struct wined3d_surface *depth_stencil)
 {
     struct wined3d_surface *front, *back;
 
