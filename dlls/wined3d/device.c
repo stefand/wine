@@ -869,7 +869,6 @@ HRESULT CDECL wined3d_device_init_3d(struct wined3d_device *device,
     struct wined3d_context *context;
     DWORD clear_flags = 0;
     HRESULT hr;
-    const struct wined3d_d3d_info *d3d_info = &device->adapter->d3d_info;
 
     TRACE("device %p, swapchain_desc %p.\n", device, swapchain_desc);
 
@@ -909,11 +908,6 @@ HRESULT CDECL wined3d_device_init_3d(struct wined3d_device *device,
     }
     device->swapchains[0] = swapchain;
     device_init_swapchain_state(device, swapchain);
-
-    wined3d_cs_emit_set_consts_f(device->cs, 0, device->state.vs_consts_f,
-            d3d_info->limits.vs_uniform_count, WINED3D_SHADER_TYPE_VERTEX);
-    wined3d_cs_emit_set_consts_f(device->cs, 0, device->state.ps_consts_f,
-            d3d_info->limits.ps_uniform_count, WINED3D_SHADER_TYPE_PIXEL);
 
     context = context_acquire(device, swapchain->front_buffer);
 
@@ -4125,7 +4119,6 @@ HRESULT CDECL wined3d_device_reset(struct wined3d_device *device,
     UINT backbuffer_height = swapchain_desc->backbuffer_height;
     HRESULT hr = WINED3D_OK;
     unsigned int i;
-    const struct wined3d_d3d_info *d3d_info = &device->adapter->d3d_info;
 
     TRACE("device %p, swapchain_desc %p, mode %p, callback %p.\n", device, swapchain_desc, mode, callback);
 
@@ -4459,16 +4452,7 @@ HRESULT CDECL wined3d_device_reset(struct wined3d_device *device,
     swapchain_update_draw_bindings(swapchain);
 
     if (reset_state && device->d3d_initialized)
-    {
         hr = create_primary_opengl_context(device, swapchain);
-        if (FAILED(hr))
-            return hr;
-
-        wined3d_cs_emit_set_consts_f(device->cs, 0, device->state.vs_consts_f,
-                d3d_info->limits.vs_uniform_count, WINED3D_SHADER_TYPE_VERTEX);
-        wined3d_cs_emit_set_consts_f(device->cs, 0, device->state.ps_consts_f,
-                d3d_info->limits.ps_uniform_count, WINED3D_SHADER_TYPE_PIXEL);
-    }
 
     /* All done. There is no need to reload resources or shaders, this will happen automatically on the
      * first use
