@@ -527,7 +527,7 @@ void wined3d_cs_emit_set_viewport(struct wined3d_cs *cs, const struct wined3d_vi
 
     op = cs->ops->require_space(cs, sizeof(*op));
     op->opcode = WINED3D_CS_OP_SET_VIEWPORT;
-    op->viewport = *vp;
+    op->viewport = *viewport;
 
     cs->ops->submit(cs);
 }
