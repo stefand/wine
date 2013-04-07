@@ -2986,6 +2986,8 @@ void wined3d_cs_emit_set_consts_f(struct wined3d_cs *cs, UINT start_register, co
 void wined3d_cs_emit_glfinish(struct wined3d_cs *cs) DECLSPEC_HIDDEN;
 void wined3d_cs_emit_set_base_vertex_index(struct wined3d_cs *cs,
         UINT base_vertex_index) DECLSPEC_HIDDEN;
+void wined3d_cs_emit_set_primitive_type(struct wined3d_cs *cs,
+        GLenum primitive_type) DECLSPEC_HIDDEN;
 
 static inline void wined3d_cs_push_constants(struct wined3d_cs *cs, enum wined3d_push_constants p,
         unsigned int start_idx, unsigned int count, const void *constants)
