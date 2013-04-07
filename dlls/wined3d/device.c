@@ -1949,6 +1949,9 @@ void CDECL wined3d_device_set_base_vertex_index(struct wined3d_device *device, I
     TRACE("device %p, base_index %d.\n", device, base_index);
 
     device->update_state->base_vertex_index = base_index;
+
+    if (!device->recording)
+        wined3d_cs_emit_set_base_vertex_index(device->cs, base_index);
 }
 
 INT CDECL wined3d_device_get_base_vertex_index(const struct wined3d_device *device)
@@ -3458,12 +3461,6 @@ HRESULT CDECL wined3d_device_draw_primitive(struct wined3d_device *device, UINT 
 {
     TRACE("device %p, start_vertex %u, vertex_count %u.\n", device, start_vertex, vertex_count);
 
-    if (device->state.load_base_vertex_index)
-    {
-        device->state.load_base_vertex_index = 0;
-        device_invalidate_state(device, STATE_BASEVERTEXINDEX);
-    }
-
     wined3d_cs_emit_transfer_stateblock(device->cs, &device->state);
     wined3d_cs_emit_draw(device->cs, start_vertex, vertex_count, 0, 0, FALSE);
 
@@ -3481,8 +3478,6 @@ void CDECL wined3d_device_draw_primitive_instanced(struct wined3d_device *device
 
 HRESULT CDECL wined3d_device_draw_indexed_primitive(struct wined3d_device *device, UINT start_idx, UINT index_count)
 {
-    const struct wined3d_gl_info *gl_info = &device->adapter->gl_info;
-
     TRACE("device %p, start_idx %u, index_count %u.\n", device, start_idx, index_count);
 
     if (!device->state.index_buffer)
@@ -3493,13 +3488,6 @@ HRESULT CDECL wined3d_device_draw_indexed_primitive(struct wined3d_device *devic
          * D3DERR_INVALIDCALL there as well. */
         WARN("Called without a valid index buffer set, returning WINED3DERR_INVALIDCALL.\n");
         return WINED3DERR_INVALIDCALL;
-    }
-
-    if (!gl_info->supported[ARB_DRAW_ELEMENTS_BASE_VERTEX] &&
-            device->state.load_base_vertex_index != device->state.base_vertex_index)
-    {
-        device->state.load_base_vertex_index = device->state.base_vertex_index;
-        device_invalidate_state(device, STATE_BASEVERTEXINDEX);
     }
 
     wined3d_cs_emit_transfer_stateblock(device->cs, &device->state);
