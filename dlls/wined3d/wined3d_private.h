@@ -3000,6 +3000,9 @@ void wined3d_cs_emit_blt(struct wined3d_cs *cs, struct wined3d_surface *dst_surf
         const RECT *dst_rect, struct wined3d_surface *src_surface,
         const RECT *src_rect, DWORD flags, const struct wined3d_blt_fx *fx,
         enum wined3d_texture_filter_type filter) DECLSPEC_HIDDEN;
+void wined3d_cs_emit_clear_rtv(struct wined3d_cs *cs, struct wined3d_rendertarget_view *view,
+        const RECT *rect, DWORD flags, const struct wined3d_color *color, float depth, DWORD stencil,
+        const struct blit_shader *blitter) DECLSPEC_HIDDEN;
 
 static inline void wined3d_cs_push_constants(struct wined3d_cs *cs, enum wined3d_push_constants p,
         unsigned int start_idx, unsigned int count, const void *constants)
