@@ -3627,20 +3627,15 @@ HRESULT CDECL wined3d_device_color_fill(struct wined3d_device *device,
         return WINED3DERR_INVALIDCALL;
     }
 
-    if (wined3d_settings.cs_multithreaded)
-    {
-        FIXME("Waiting for cs.\n");
-        wined3d_cs_emit_glfinish(device->cs);
-        device->cs->ops->finish(device->cs);
-    }
-
     if (!rect)
     {
         SetRect(&r, 0, 0, surface->resource.width, surface->resource.height);
         rect = &r;
     }
 
-    return surface_color_fill(surface, rect, color);
+    wined3d_cs_emit_color_fill(device->cs, surface, rect, color);
+
+    return WINED3D_OK;
 }
 
 void CDECL wined3d_device_clear_rendertarget_view(struct wined3d_device *device,
