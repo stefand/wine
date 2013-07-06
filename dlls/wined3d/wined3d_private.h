@@ -2077,6 +2077,7 @@ HRESULT resource_init(struct wined3d_resource *resource, struct wined3d_device *
 DWORD resource_set_priority(struct wined3d_resource *resource, DWORD priority) DECLSPEC_HIDDEN;
 void resource_unload(struct wined3d_resource *resource) DECLSPEC_HIDDEN;
 BOOL wined3d_resource_allocate_sysmem(struct wined3d_resource *resource) DECLSPEC_HIDDEN;
+void *wined3d_resource_allocate_sysmem2(struct wined3d_resource *resource) DECLSPEC_HIDDEN;
 void wined3d_resource_free_sysmem(struct wined3d_resource *resource) DECLSPEC_HIDDEN;
 DWORD wined3d_resource_sanitize_map_flags(const struct wined3d_resource *resource,
         DWORD flags) DECLSPEC_HIDDEN;
@@ -2601,6 +2602,8 @@ void wined3d_cs_emit_color_fill(struct wined3d_cs *cs, struct wined3d_surface *s
 void *wined3d_cs_emit_resource_map(struct wined3d_cs *cs, struct wined3d_resource *resource,
         DWORD flags) DECLSPEC_HIDDEN;
 void wined3d_cs_emit_resource_unmap(struct wined3d_cs *cs, struct wined3d_resource *resource) DECLSPEC_HIDDEN;
+void wined3d_cs_emit_swap_mem(struct wined3d_cs *cs, struct wined3d_buffer *buffer,
+        BYTE *mem) DECLSPEC_HIDDEN;
 
 /* Direct3D terminology with little modifications. We do not have an issued state
  * because only the driver knows about it, but we have a created state because d3d

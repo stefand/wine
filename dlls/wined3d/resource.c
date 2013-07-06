@@ -213,6 +213,21 @@ void CDECL wined3d_resource_get_desc(const struct wined3d_resource *resource, st
     desc->size = resource->size;
 }
 
+void *wined3d_resource_allocate_sysmem2(struct wined3d_resource *resource)
+{
+    void **p;
+    SIZE_T align = RESOURCE_ALIGNMENT - 1 + sizeof(*p);
+    void *mem;
+
+    if (!(mem = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, resource->size + align)))
+        return FALSE;
+
+    p = (void **)(((ULONG_PTR)mem + align) & ~(RESOURCE_ALIGNMENT - 1)) - 1;
+    *p = mem;
+
+    return ++p;
+}
+
 BOOL wined3d_resource_allocate_sysmem(struct wined3d_resource *resource)
 {
     void **p;

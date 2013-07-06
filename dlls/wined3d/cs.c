@@ -65,6 +65,7 @@ enum wined3d_cs_op
     WINED3D_CS_OP_COLOR_FILL,
     WINED3D_CS_OP_RESOURCE_MAP,
     WINED3D_CS_OP_RESOURCE_UNMAP,
+    WINED3D_CS_OP_SWAP_MEM,
     WINED3D_CS_OP_STOP,
 };
 
@@ -345,6 +346,13 @@ struct wined3d_cs_skip
 {
     enum wined3d_cs_op opcode;
     DWORD size;
+};
+
+struct wined3d_cs_swap_mem
+{
+    enum wined3d_cs_op opcode;
+    struct wined3d_buffer *buffer;
+    BYTE *mem;
 };
 
 static void wined3d_cs_submit(struct wined3d_cs *cs, size_t size)
@@ -1611,6 +1619,34 @@ void wined3d_cs_emit_resource_unmap(struct wined3d_cs *cs, struct wined3d_resour
     cs->ops->submit(cs, sizeof(*op));
 }
 
+static UINT wined3d_cs_exec_swap_mem(struct wined3d_cs *cs, const void *data)
+{
+    const struct wined3d_cs_swap_mem *op = data;
+    struct wined3d_buffer *buffer = op->buffer;
+
+    wined3d_resource_free_sysmem(&buffer->resource);
+    buffer->resource.heap_memory = op->mem;
+
+    if (!buffer->buffer_object && buffer->resource.bind_count)
+    {
+        device_invalidate_state(cs->device, STATE_STREAMSRC);
+        device_invalidate_state(cs->device, STATE_INDEXBUFFER);
+    }
+    return sizeof(*op);
+}
+
+void wined3d_cs_emit_swap_mem(struct wined3d_cs *cs, struct wined3d_buffer *buffer, BYTE *mem)
+{
+    struct wined3d_cs_swap_mem *op;
+
+    op = cs->ops->require_space(cs, sizeof(*op));
+    op->opcode = WINED3D_CS_OP_SWAP_MEM;
+    op->buffer = buffer;
+    op->mem = mem;
+
+    cs->ops->submit(cs, sizeof(*op));
+}
+
 static UINT (* const wined3d_cs_op_handlers[])(struct wined3d_cs *cs, const void *data) =
 {
     /* WINED3D_CS_OP_NOP                    */ wined3d_cs_exec_nop,
@@ -1654,6 +1690,7 @@ static UINT (* const wined3d_cs_op_handlers[])(struct wined3d_cs *cs, const void
     /* WINED3D_CS_OP_COLOR_FILL             */ wined3d_cs_exec_color_fill,
     /* WINED3D_CS_OP_RESOURCE_MAP           */ wined3d_cs_exec_resource_map,
     /* WINED3D_CS_OP_RESOURCE_UNMAP         */ wined3d_cs_exec_resource_unmap,
+    /* WINED3D_CS_OP_SWAP_MEM               */ wined3d_cs_exec_swap_mem,
 };
 
 static void *wined3d_cs_mt_require_space(struct wined3d_cs *cs, size_t size)
