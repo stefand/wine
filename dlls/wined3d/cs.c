@@ -1745,7 +1745,7 @@ void wined3d_cs_emit_query_get_data(struct wined3d_cs *cs, struct wined3d_query 
 {
     struct wined3d_cs_query_get_data *op;
 
-    op = cs->ops->require_space(cs, sizeof(*op));
+    op = cs->ops->require_space_prio(cs, sizeof(*op));
     op->opcode = WINED3D_CS_OP_QUERY_GET_DATA;
     op->query = query;
     op->data = data;
@@ -1753,12 +1753,8 @@ void wined3d_cs_emit_query_get_data(struct wined3d_cs *cs, struct wined3d_query 
     op->flags = flags;
     op->ret = ret;
 
-    cs->ops->submit(cs, sizeof(*op));
-
-    if (wined3d_settings.cs_multithreaded)
-        FIXME("Query handling is not particularly fast yet\n");
-
-    cs->ops->finish(cs);
+    cs->ops->submit_prio(cs, sizeof(*op));
+    cs->ops->finish_prio(cs);
 }
 
 static UINT (* const wined3d_cs_op_handlers[])(struct wined3d_cs *cs, const void *data) =
