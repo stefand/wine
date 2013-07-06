@@ -365,12 +365,20 @@ struct wined3d_cs_query_issue
     DWORD flags;
 };
 
-static void wined3d_cs_submit(struct wined3d_cs *cs, size_t size)
+static void wined3d_cs_mt_submit(struct wined3d_cs *cs, size_t size)
 {
     LONG new_val = (cs->queue.head + size) & (WINED3D_CS_QUEUE_SIZE - 1);
     /* There is only one thread writing to queue.head, InterlockedExchange
      * is used for the memory barrier. */
     InterlockedExchange(&cs->queue.head, new_val);
+}
+
+static void wined3d_cs_mt_submit_prio(struct wined3d_cs *cs, size_t size)
+{
+    LONG new_val = (cs->prio_queue.head + size) & (WINED3D_CS_QUEUE_SIZE - 1);
+    /* There is only one thread writing to queue.head, InterlockedExchange
+     * is used for the memory barrier. */
+    InterlockedExchange(&cs->prio_queue.head, new_val);
 }
 
 static UINT wined3d_cs_exec_nop(struct wined3d_cs *cs, const void *data)
@@ -406,15 +414,16 @@ static void wined3d_cs_emit_fence(struct wined3d_cs *cs, BOOL *signalled)
     cs->ops->submit(cs, sizeof(*op));
 }
 
-static void wined3d_cs_finish(struct wined3d_cs *cs)
+static void wined3d_cs_emit_fence_prio(struct wined3d_cs *cs, BOOL *signalled)
 {
-    BOOL fence;
+    struct wined3d_cs_fence *op;
 
-    wined3d_cs_emit_fence(cs, &fence);
+    *signalled = FALSE;
 
-    /* A busy wait should be fine, we're not supposed to have to wait very
-     * long. */
-    while (!InterlockedCompareExchange(&fence, TRUE, TRUE));
+    op = cs->ops->require_space_prio(cs, sizeof(*op));
+    op->opcode = WINED3D_CS_OP_FENCE;
+    op->signalled = signalled;
+    cs->ops->submit_prio(cs, sizeof(*op));
 }
 
 static UINT wined3d_cs_exec_present(struct wined3d_cs *cs, const void *data)
@@ -1715,9 +1724,9 @@ static UINT (* const wined3d_cs_op_handlers[])(struct wined3d_cs *cs, const void
     /* WINED3D_CS_OP_QUERY_ISSUE                */ wined3d_cs_exec_query_issue,
 };
 
-static void *wined3d_cs_mt_require_space(struct wined3d_cs *cs, size_t size)
+static inline void *_wined3d_cs_mt_require_space(struct wined3d_cs *cs, size_t size, BOOL prio)
 {
-    struct wined3d_cs_queue *queue = &cs->queue;
+    struct wined3d_cs_queue *queue = prio ? &cs->prio_queue : &cs->queue;
     size_t queue_size = sizeof(queue->data) / sizeof(*queue->data);
 
     if (queue_size - size < queue->head)
@@ -1725,7 +1734,7 @@ static void *wined3d_cs_mt_require_space(struct wined3d_cs *cs, size_t size)
         struct wined3d_cs_skip *skip;
         size_t nop_size = queue_size - queue->head;
 
-        skip = wined3d_cs_mt_require_space(cs, nop_size);
+        skip = _wined3d_cs_mt_require_space(cs, nop_size, prio);
         if (nop_size < sizeof(*skip))
         {
             skip->opcode = WINED3D_CS_OP_NOP;
@@ -1736,7 +1745,11 @@ static void *wined3d_cs_mt_require_space(struct wined3d_cs *cs, size_t size)
             skip->size = nop_size;
         }
 
-        cs->ops->submit(cs, nop_size);
+        if (prio)
+            cs->ops->submit_prio(cs, nop_size);
+        else
+            cs->ops->submit(cs, nop_size);
+
         assert(!queue->head);
     }
 
@@ -1784,6 +1797,16 @@ static void wined3d_cs_st_push_constants(struct wined3d_cs *cs, enum wined3d_pus
     }
 }
 
+static inline void *wined3d_cs_mt_require_space(struct wined3d_cs *cs, size_t size)
+{
+    return _wined3d_cs_mt_require_space(cs, size, FALSE);
+}
+
+static inline void *wined3d_cs_mt_require_space_prio(struct wined3d_cs *cs, size_t size)
+{
+    return _wined3d_cs_mt_require_space(cs, size, TRUE);
+}
+
 static void wined3d_cs_mt_push_constants(struct wined3d_cs *cs, enum wined3d_push_constants p,
         unsigned int start_idx, unsigned int count, const void *constants)
 {
@@ -1798,6 +1821,50 @@ static void wined3d_cs_mt_push_constants(struct wined3d_cs *cs, enum wined3d_pus
     memcpy(op->constants, constants, data_size);
 
     cs->ops->submit(cs, op_size);
+}
+
+static void wined3d_cs_mt_finish(struct wined3d_cs *cs)
+{
+    BOOL fence;
+
+    if (cs->thread_id == GetCurrentThreadId())
+    {
+        static BOOL once;
+        if (!once)
+        {
+            FIXME("flush_and_wait called from cs thread\n");
+            once = TRUE;
+        }
+        return;
+    }
+
+    wined3d_cs_emit_fence(cs, &fence);
+
+    /* A busy wait should be fine, we're not supposed to have to wait very
+     * long. */
+    while (!InterlockedCompareExchange(&fence, TRUE, TRUE));
+}
+
+static void wined3d_cs_mt_finish_prio(struct wined3d_cs *cs)
+{
+    BOOL fence;
+
+    if (cs->thread_id == GetCurrentThreadId())
+    {
+        static BOOL once;
+        if (!once)
+        {
+            FIXME("flush_and_wait called from cs thread\n");
+            once = TRUE;
+        }
+        return;
+    }
+
+    wined3d_cs_emit_fence_prio(cs, &fence);
+
+    /* A busy wait should be fine, we're not supposed to have to wait very
+     * long. */
+    while (!InterlockedCompareExchange(&fence, TRUE, TRUE));
 }
 
 static void wined3d_cs_st_submit(struct wined3d_cs *cs, size_t size)
@@ -1825,7 +1892,10 @@ static void *wined3d_cs_st_require_space(struct wined3d_cs *cs, size_t size)
 static const struct wined3d_cs_ops wined3d_cs_st_ops =
 {
     wined3d_cs_st_require_space,
+    wined3d_cs_st_require_space,
     wined3d_cs_st_submit,
+    wined3d_cs_st_submit,
+    wined3d_cs_st_finish,
     wined3d_cs_st_finish,
     wined3d_cs_st_push_constants,
 };
@@ -1833,8 +1903,11 @@ static const struct wined3d_cs_ops wined3d_cs_st_ops =
 static const struct wined3d_cs_ops wined3d_cs_mt_ops =
 {
     wined3d_cs_mt_require_space,
-    wined3d_cs_submit,
-    wined3d_cs_finish,
+    wined3d_cs_mt_require_space_prio,
+    wined3d_cs_mt_submit,
+    wined3d_cs_mt_submit_prio,
+    wined3d_cs_mt_finish,
+    wined3d_cs_mt_finish_prio,
     wined3d_cs_mt_push_constants,
 };
 
@@ -1847,7 +1920,7 @@ static void wined3d_cs_emit_stop(struct wined3d_cs *cs)
     op = wined3d_cs_mt_require_space(cs, sizeof(*op));
     op->opcode = WINED3D_CS_OP_STOP;
 
-    wined3d_cs_submit(cs, sizeof(*op));
+    wined3d_cs_mt_submit(cs, sizeof(*op));
 }
 
 void wined3d_cs_switch_onscreen_ds(struct wined3d_cs *cs,
@@ -1894,6 +1967,7 @@ static DWORD WINAPI wined3d_cs_run(void *thread_param)
     enum wined3d_cs_op opcode;
     LONG tail;
     char poll = 0;
+    struct wined3d_cs_queue *queue;
 
     TRACE("Started.\n");
 
@@ -1909,13 +1983,23 @@ static DWORD WINAPI wined3d_cs_run(void *thread_param)
         else
             poll++;
 
-        if (*((volatile LONG *)&cs->queue.head) == cs->queue.tail)
+        if (*((volatile LONG *)&cs->prio_queue.head) != cs->prio_queue.tail)
+        {
+            queue = &cs->prio_queue;
+        }
+        else if (*((volatile LONG *)&cs->queue.head) != cs->queue.tail)
+        {
+            queue = &cs->queue;
+            if (*((volatile LONG *)&cs->prio_queue.head) != cs->prio_queue.tail)
+                queue = &cs->prio_queue;
+        }
+        else
         {
             continue;
         }
 
-        tail = cs->queue.tail;
-        opcode = *(const enum wined3d_cs_op *)&cs->queue.data[tail];
+        tail = queue->tail;
+        opcode = *(const enum wined3d_cs_op *)&queue->data[tail];
 
         if (opcode >= WINED3D_CS_OP_STOP)
         {
@@ -1924,9 +2008,9 @@ static DWORD WINAPI wined3d_cs_run(void *thread_param)
             goto done;
         }
 
-        tail += wined3d_cs_op_handlers[opcode](cs, &cs->queue.data[tail]);
+        tail += wined3d_cs_op_handlers[opcode](cs, &queue->data[tail]);
         tail &= (WINED3D_CS_QUEUE_SIZE - 1);
-        InterlockedExchange(&cs->queue.tail, tail);
+        InterlockedExchange(&queue->tail, tail);
     }
 
 done:
