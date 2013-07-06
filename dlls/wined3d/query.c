@@ -241,6 +241,15 @@ ULONG CDECL wined3d_query_decref(struct wined3d_query *query)
 
     if (!refcount)
     {
+        if (wined3d_settings.cs_multithreaded)
+        {
+            struct wined3d_device *device = query->device;
+
+            FIXME("waiting for cs\n");
+            wined3d_cs_emit_glfinish(device->cs);
+            device->cs->ops->finish(device->cs);
+        }
+
         /* Queries are specific to the GL context that created them. Not
          * deleting the query will obviously leak it, but that's still better
          * than potentially deleting a different query with the same id in this
@@ -275,20 +284,10 @@ ULONG CDECL wined3d_query_decref(struct wined3d_query *query)
 HRESULT CDECL wined3d_query_get_data(struct wined3d_query *query,
         void *data, UINT data_size, DWORD flags)
 {
-    HRESULT hr;
     TRACE("query %p, data %p, data_size %u, flags %#x.\n",
             query, data, data_size, flags);
 
-    if (query->counter_main != query->counter_worker)
-    {
-        TRACE("D3DISSUE_END command not submitted to GL yet\n");
-        return S_FALSE;
-    }
-
-    wined3d_cs_emit_query_get_data(query->device->cs, query, data, data_size,
-            flags, &hr);
-
-    return hr;
+    return query->query_ops->query_get_data(query, data, data_size, flags);
 }
 
 UINT CDECL wined3d_query_get_data_size(const struct wined3d_query *query)
@@ -312,16 +311,10 @@ HRESULT CDECL wined3d_query_issue(struct wined3d_query *query, DWORD flags)
 static HRESULT wined3d_occlusion_query_ops_get_data(struct wined3d_query *query,
         void *pData, DWORD dwSize, DWORD flags)
 {
-    struct wined3d_occlusion_query *oq = query->extendedData;
     struct wined3d_device *device = query->device;
     const struct wined3d_gl_info *gl_info = &device->adapter->gl_info;
-    struct wined3d_context *context;
-    DWORD* data = pData;
-    GLuint available;
-    GLuint samples;
-    HRESULT res;
-
-    TRACE("(%p) : type D3DQUERY_OCCLUSION, pData %p, dwSize %#x, flags %#x.\n", query, pData, dwSize, flags);
+    struct wined3d_occlusion_query *oq = query->extendedData;
+    DWORD *data = pData;
 
     if (!oq->context)
         query->state = QUERY_CREATED;
@@ -333,6 +326,8 @@ static HRESULT wined3d_occlusion_query_ops_get_data(struct wined3d_query *query,
         if(data) *data = 0;
         return S_OK;
     }
+
+    TRACE("(%p) : type D3DQUERY_OCCLUSION, pData %p, dwSize %#x, flags %#x.\n", query, pData, dwSize, flags);
 
     if (query->state == QUERY_BUILDING)
     {
@@ -348,11 +343,37 @@ static HRESULT wined3d_occlusion_query_ops_get_data(struct wined3d_query *query,
         return S_OK;
     }
 
+    if (!wined3d_settings.cs_multithreaded)
+    {
+        if (!query->query_ops->query_poll(query))
+            return S_FALSE;
+    }
+    else if (query->counter_main != query->counter_retrieved)
+    {
+        return S_FALSE;
+    }
+
+    if (data)
+        *data = oq->samples;
+
+    return S_OK;
+}
+
+static BOOL wined3d_occlusion_query_ops_poll(struct wined3d_query *query)
+{
+    struct wined3d_occlusion_query *oq = query->extendedData;
+    struct wined3d_device *device = query->device;
+    const struct wined3d_gl_info *gl_info = &device->adapter->gl_info;
+    struct wined3d_context *context;
+    GLuint available;
+    GLuint samples;
+    BOOL ret;
+
     if (oq->context->tid != GetCurrentThreadId())
     {
         FIXME("%p Wrong thread, returning 1.\n", query);
-        *data = 1;
-        return S_OK;
+        oq->samples = 1;
+        return TRUE;
     }
 
     context = context_acquire(query->device, oq->context->current_rt);
@@ -363,23 +384,49 @@ static HRESULT wined3d_occlusion_query_ops_get_data(struct wined3d_query *query,
 
     if (available)
     {
-        if (data)
-        {
-            GL_EXTCALL(glGetQueryObjectuivARB(oq->id, GL_QUERY_RESULT_ARB, &samples));
-            checkGLcall("glGetQueryObjectuivARB(GL_QUERY_RESULT)");
-            TRACE("Returning %d samples.\n", samples);
-            *data = samples;
-        }
-        res = S_OK;
+        GL_EXTCALL(glGetQueryObjectuivARB(oq->id, GL_QUERY_RESULT_ARB, &samples));
+        checkGLcall("glGetQueryObjectuivARB(GL_QUERY_RESULT)");
+        TRACE("Returning %d samples.\n", samples);
+        oq->samples = samples;
+        ret = TRUE;
     }
     else
     {
-        res = S_FALSE;
+        ret = FALSE;
     }
 
     context_release(context);
 
-    return res;
+    return ret;
+}
+
+static BOOL wined3d_event_query_ops_poll(struct wined3d_query *query)
+{
+    struct wined3d_event_query *event_query = query->extendedData;
+    enum wined3d_event_query_result ret;
+
+    ret = wined3d_event_query_test(event_query, query->device);
+    switch(ret)
+    {
+        case WINED3D_EVENT_QUERY_OK:
+        case WINED3D_EVENT_QUERY_NOT_STARTED:
+            return TRUE;
+
+        case WINED3D_EVENT_QUERY_WAITING:
+            return FALSE;
+
+        case WINED3D_EVENT_QUERY_WRONG_THREAD:
+            FIXME("(%p) Wrong thread, reporting GPU idle.\n", query);
+            return TRUE;
+
+        case WINED3D_EVENT_QUERY_ERROR:
+            ERR("The GL event query failed, returning D3DERR_INVALIDCALL\n");
+            return TRUE;
+
+        default:
+            ERR("Unexpected wined3d_event_query_test result %u\n", ret);
+            return TRUE;
+    }
 }
 
 static HRESULT wined3d_event_query_ops_get_data(struct wined3d_query *query,
@@ -399,27 +446,15 @@ static HRESULT wined3d_event_query_ops_get_data(struct wined3d_query *query,
         return S_OK;
     }
 
-    ret = wined3d_event_query_test(event_query, query->device);
-    switch(ret)
-    {
-        case WINED3D_EVENT_QUERY_OK:
-        case WINED3D_EVENT_QUERY_NOT_STARTED:
-            *data = TRUE;
-            break;
+    if (!wined3d_settings.cs_multithreaded)
+        ret = query->query_ops->query_poll(query);
+    else if (query->counter_main != query->counter_retrieved)
+        ret = FALSE;
+    else
+        ret = TRUE;
 
-        case WINED3D_EVENT_QUERY_WAITING:
-            *data = FALSE;
-            break;
-
-        case WINED3D_EVENT_QUERY_WRONG_THREAD:
-            FIXME("(%p) Wrong thread, reporting GPU idle.\n", query);
-            *data = TRUE;
-            break;
-
-        case WINED3D_EVENT_QUERY_ERROR:
-            ERR("The GL event query failed, returning D3DERR_INVALIDCALL\n");
-            return WINED3DERR_INVALIDCALL;
-    }
+    if (data)
+        *data = ret;
 
     return S_OK;
 }
@@ -600,7 +635,12 @@ static HRESULT wined3d_timestamp_query_ops_get_data(struct wined3d_query *query,
     return res;
 }
 
-static HRESULT wined3d_timestamp_query_ops_issue(struct wined3d_query *query, DWORD flags)
+static BOOL wined3d_timestamp_query_ops_poll(struct wined3d_query *query)
+{
+    return FALSE;
+}
+
+static void wined3d_timestamp_query_ops_issue(struct wined3d_query *query, DWORD flags)
 {
     struct wined3d_device *device = query->device;
     const struct wined3d_gl_info *gl_info = &device->adapter->gl_info;
@@ -634,8 +674,6 @@ static HRESULT wined3d_timestamp_query_ops_issue(struct wined3d_query *query, DW
 
     if (flags & WINED3DISSUE_END)
         query->state = QUERY_SIGNALLED;
-
-    return WINED3D_OK;
 }
 
 static HRESULT wined3d_timestamp_disjoint_query_ops_get_data(struct wined3d_query *query,
@@ -669,7 +707,7 @@ static HRESULT wined3d_timestamp_disjoint_query_ops_get_data(struct wined3d_quer
     return S_OK;
 }
 
-static HRESULT wined3d_timestamp_disjoint_query_ops_issue(struct wined3d_query *query, DWORD flags)
+static void wined3d_timestamp_disjoint_query_ops_issue(struct wined3d_query *query, DWORD flags)
 {
     TRACE("query %p, flags %#x.\n", query, flags);
 
@@ -677,31 +715,33 @@ static HRESULT wined3d_timestamp_disjoint_query_ops_issue(struct wined3d_query *
         query->state = QUERY_BUILDING;
     if (flags & WINED3DISSUE_END)
         query->state = QUERY_SIGNALLED;
-
-    return WINED3D_OK;
 }
 
 static const struct wined3d_query_ops event_query_ops =
 {
     wined3d_event_query_ops_get_data,
+    wined3d_event_query_ops_poll,
     wined3d_event_query_ops_issue,
 };
 
 static const struct wined3d_query_ops occlusion_query_ops =
 {
     wined3d_occlusion_query_ops_get_data,
+    wined3d_occlusion_query_ops_poll,
     wined3d_occlusion_query_ops_issue,
 };
 
 static const struct wined3d_query_ops timestamp_query_ops =
 {
     wined3d_timestamp_query_ops_get_data,
+    wined3d_timestamp_query_ops_poll,
     wined3d_timestamp_query_ops_issue,
 };
 
 static const struct wined3d_query_ops timestamp_disjoint_query_ops =
 {
     wined3d_timestamp_disjoint_query_ops_get_data,
+    wined3d_timestamp_query_ops_poll,
     wined3d_timestamp_disjoint_query_ops_issue,
 };
 
@@ -775,11 +815,10 @@ static HRESULT query_init(struct wined3d_query *query, struct wined3d_device *de
                 WARN("Unsupported in local OpenGL implementation: ARB_TIMER_QUERY.\n");
                 return WINED3DERR_NOTAVAILABLE;
             }
-            query->query_ops = &timestamp_disjoint_query_ops;
-            query->data_size = type == WINED3D_QUERY_TYPE_TIMESTAMP_DISJOINT
-                    ? sizeof(struct wined3d_query_data_timestamp_disjoint) : sizeof(UINT64);
-            query->extendedData = NULL;
-            break;
+            /* I quickly need a rebased CS for a lan party. I can't be bothered to add
+             * timestamp query support at the moment :-\ */
+            FIXME("Not implemented in command stream yet.\n");
+            return WINED3DERR_NOTAVAILABLE;
 
         case WINED3D_QUERY_TYPE_VCACHE:
         case WINED3D_QUERY_TYPE_RESOURCE_MANAGER:
@@ -799,6 +838,7 @@ static HRESULT query_init(struct wined3d_query *query, struct wined3d_device *de
     query->state = QUERY_CREATED;
     query->device = device;
     query->ref = 1;
+    list_init(&query->poll_list_entry);
 
     return WINED3D_OK;
 }
