@@ -1068,10 +1068,19 @@ HRESULT CDECL wined3d_buffer_map(struct wined3d_buffer *buffer, UINT offset, UIN
             buffer->flags |= WINED3D_BUFFER_NOSYNC;
     }
 
-    if (!(flags & WINED3D_MAP_NOOVERWRITE) && wined3d_settings.cs_multithreaded)
+    if (wined3d_settings.cs_multithreaded && count == 1)
     {
-        FIXME("waiting for cs.\n");
-        device->cs->ops->finish(device->cs);
+        BOOL swvp = device->create_parms.flags & WINED3DCREATE_SOFTWARE_VERTEXPROCESSING;
+        if (flags & WINED3D_MAP_DISCARD && !swvp)
+        {
+            buffer->map_mem = wined3d_resource_allocate_sysmem2(&buffer->resource);
+            wined3d_cs_emit_swap_mem(device->cs, buffer, buffer->map_mem);
+        }
+        else if(!(flags & WINED3D_MAP_NOOVERWRITE))
+        {
+            FIXME("waiting for cs.\n");
+            device->cs->ops->finish(device->cs);
+        }
     }
 
     base = buffer->map_ptr ? buffer->map_ptr : buffer->map_mem;
