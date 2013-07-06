@@ -1699,8 +1699,12 @@ void wined3d_cs_emit_buffer_invalidate_bo_range(struct wined3d_cs *cs,
 static UINT wined3d_cs_exec_query_issue(struct wined3d_cs *cs, const void *data)
 {
     const struct wined3d_cs_query_issue *op = data;
+    struct wined3d_query *query = op->query;
 
-    op->query->query_ops->query_issue(op->query, op->flags);
+    query->query_ops->query_issue(query, op->flags);
+
+    if (op->flags & WINED3DISSUE_END)
+        InterlockedIncrement(&query->counter_worker);
 
     return sizeof(*op);
 }
