@@ -191,7 +191,10 @@ static void buffer_create_buffer_object(struct wined3d_buffer *This, struct wine
     if (This->flags & WINED3D_BUFFER_DOUBLEBUFFER)
         buffer_invalidate_bo_range(This, 0, 0);
     else
+    {
         wined3d_resource_free_sysmem(&This->resource);
+        This->map_mem = NULL;
+    }
 
     return;
 
@@ -493,6 +496,7 @@ BYTE *buffer_get_sysmem(struct wined3d_buffer *This, struct wined3d_context *con
 
     if (!wined3d_resource_allocate_sysmem(&This->resource))
         ERR("Failed to allocate system memory.\n");
+    This->map_mem = This->resource.heap_memory;
 
     if (This->buffer_type_hint == GL_ELEMENT_ARRAY_BUFFER_ARB)
         context_invalidate_state(context, STATE_INDEXBUFFER);
@@ -1050,6 +1054,7 @@ HRESULT CDECL wined3d_buffer_map(struct wined3d_buffer *buffer, UINT offset, UIN
                     TRACE("New pointer is %p.\n", buffer->resource.heap_memory);
                     buffer->map_ptr = NULL;
                 }
+                buffer->map_mem = buffer->resource.heap_memory;
                 context_release(context);
             }
         }
@@ -1069,7 +1074,7 @@ HRESULT CDECL wined3d_buffer_map(struct wined3d_buffer *buffer, UINT offset, UIN
         device->cs->ops->finish(device->cs);
     }
 
-    base = buffer->map_ptr ? buffer->map_ptr : buffer->resource.heap_memory;
+    base = buffer->map_ptr ? buffer->map_ptr : buffer->map_mem;
     *data = base + offset;
 
     TRACE("Returning memory at %p (base %p, offset %u).\n", *data, base, offset);
@@ -1140,6 +1145,7 @@ void CDECL wined3d_buffer_unmap(struct wined3d_buffer *buffer)
             gl_info->gl_ops.gl.p_glFlush(); /* Flush to ensure ordering across contexts. */
         context_release(context);
 
+        buffer->map_mem = NULL;
         buffer_clear_dirty_areas(buffer);
         buffer->map_ptr = NULL;
     }
@@ -1188,6 +1194,7 @@ static HRESULT buffer_init(struct wined3d_buffer *buffer, struct wined3d_device 
         return hr;
     }
     buffer->buffer_type_hint = bind_hint;
+    buffer->map_mem = buffer->resource.heap_memory;
 
     TRACE("size %#x, usage %#x, format %s, memory @ %p, iface @ %p.\n", buffer->resource.size, buffer->resource.usage,
             debug_d3dformat(buffer->resource.format->id), buffer->resource.heap_memory, buffer);
