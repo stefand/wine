@@ -3005,6 +3005,10 @@ void *wined3d_cs_emit_texture_map(struct wined3d_cs *cs, struct wined3d_texture 
         unsigned int sub_resource_idx, DWORD flags) DECLSPEC_HIDDEN;
 void wined3d_cs_emit_texture_unmap(struct wined3d_cs *cs, struct wined3d_texture *texture,
         unsigned int sub_resource_idx) DECLSPEC_HIDDEN;
+void wined3d_cs_emit_query_issue(struct wined3d_cs *cs, struct wined3d_query *query,
+        DWORD flags) DECLSPEC_HIDDEN;
+void wined3d_cs_emit_query_get_data(struct wined3d_cs *cs, struct wined3d_query *query, void *data,
+        UINT data_size, DWORD flags, HRESULT *ret) DECLSPEC_HIDDEN;
 
 static inline void wined3d_cs_push_constants(struct wined3d_cs *cs, enum wined3d_push_constants p,
         unsigned int start_idx, unsigned int count, const void *constants)
