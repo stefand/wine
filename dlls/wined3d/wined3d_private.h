@@ -3066,6 +3066,7 @@ void wined3d_cs_emit_buffer_swap_mem(struct wined3d_cs *cs, struct wined3d_buffe
         BYTE *mem) DECLSPEC_HIDDEN;
 void wined3d_cs_emit_buffer_invalidate_bo_range(struct wined3d_cs *cs,
         struct wined3d_buffer *buffer, unsigned int offset, unsigned int size) DECLSPEC_HIDDEN;
+void wined3d_cs_emit_buffer_preload(struct wined3d_cs *cs, struct wined3d_buffer *buffer) DECLSPEC_HIDDEN;
 
 static inline void wined3d_cs_push_constants(struct wined3d_cs *cs, enum wined3d_push_constants p,
         unsigned int start_idx, unsigned int count, const void *constants)
