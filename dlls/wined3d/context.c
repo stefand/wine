@@ -2920,6 +2920,15 @@ BOOL context_apply_draw_state(struct wined3d_context *context, struct wined3d_de
     context_preload_textures(context, state);
     if (isStateDirty(context, STATE_VDECL) || isStateDirty(context, STATE_STREAMSRC))
         context_update_stream_info(context, state);
+    else
+    {
+        for (i = 0; i < sizeof(state->streams) / sizeof(*state->streams); i++)
+        {
+            if (state->streams[i].buffer)
+                buffer_internal_preload(state->streams[i].buffer, context, state);
+        }
+    }
+
     if (state->index_buffer)
     {
         if (context->stream_info.all_vbo)
