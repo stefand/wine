@@ -2986,7 +2986,12 @@ BOOL context_apply_draw_state(struct wined3d_context *context, struct wined3d_de
         for (i = 0, map = context->stream_info.use_map; map; map >>= 1, ++i)
         {
             if (map & 1)
+            {
                 buffer_mark_used(state->streams[context->stream_info.elements[i].stream_idx].buffer);
+                /* FIXME: Does this work??? */
+                buffer_internal_preload(state->streams[context->stream_info.elements[i].stream_idx].buffer,
+                        context, state);
+            }
         }
     }
     if (state->index_buffer)
