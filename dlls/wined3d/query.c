@@ -466,7 +466,7 @@ enum wined3d_query_type CDECL wined3d_query_get_type(const struct wined3d_query 
     return query->type;
 }
 
-static void wined3d_event_query_ops_issue(struct wined3d_query *query, DWORD flags)
+static BOOL wined3d_event_query_ops_issue(struct wined3d_query *query, DWORD flags)
 {
     TRACE("query %p, flags %#x.\n", query, flags);
 
@@ -476,21 +476,24 @@ static void wined3d_event_query_ops_issue(struct wined3d_query *query, DWORD fla
         struct wined3d_event_query *event_query = query->extendedData;
 
         /* Faked event query support */
-        if (!event_query) return;
+        if (!event_query) return FALSE;
 
         wined3d_event_query_issue(event_query, query->device);
+        return TRUE;
     }
     else if (flags & WINED3DISSUE_BEGIN)
     {
         /* Started implicitly at device creation */
         ERR("Event query issued with START flag - what to do?\n");
     }
+    return FALSE;
 }
 
-static void wined3d_occlusion_query_ops_issue(struct wined3d_query *query, DWORD flags)
+static BOOL wined3d_occlusion_query_ops_issue(struct wined3d_query *query, DWORD flags)
 {
     struct wined3d_device *device = query->device;
     const struct wined3d_gl_info *gl_info = &device->adapter->gl_info;
+    BOOL poll = FALSE;
 
     TRACE("query %p, flags %#x.\n", query, flags);
 
@@ -556,6 +559,7 @@ static void wined3d_occlusion_query_ops_issue(struct wined3d_query *query, DWORD
                 }
             }
             oq->started = FALSE;
+            poll = TRUE;
         }
     }
     else
@@ -563,7 +567,7 @@ static void wined3d_occlusion_query_ops_issue(struct wined3d_query *query, DWORD
         FIXME("%p Occlusion queries not supported.\n", query);
     }
 
-    return;
+    return poll;
 }
 
 static HRESULT wined3d_timestamp_query_ops_get_data(struct wined3d_query *query,
