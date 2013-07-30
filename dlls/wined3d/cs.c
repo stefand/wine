@@ -567,7 +567,10 @@ static UINT wined3d_cs_exec_draw(struct wined3d_cs *cs, const void *data)
 void wined3d_cs_emit_draw(struct wined3d_cs *cs, UINT start_idx, UINT index_count,
         UINT start_instance, UINT instance_count, BOOL indexed)
 {
+    #define WINED3D_BUFFER_DISCARDED    0x40    /* FIXME! This really does not belong here. */
+
     struct wined3d_cs_draw *op;
+    unsigned int i;
 
     op = cs->ops->require_space(cs, sizeof(*op));
     op->opcode = WINED3D_CS_OP_DRAW;
@@ -576,6 +579,12 @@ void wined3d_cs_emit_draw(struct wined3d_cs *cs, UINT start_idx, UINT index_coun
     op->start_instance = start_instance;
     op->instance_count = instance_count;
     op->indexed = indexed;
+
+    if (indexed)
+        cs->device->state.index_buffer->flags &= ~WINED3D_BUFFER_DISCARDED;
+    for (i = 0; i < 16; i++)
+        if (cs->device->state.streams[i].buffer)
+            cs->device->state.streams[i].buffer->flags &= ~WINED3D_BUFFER_DISCARDED;
 
     cs->ops->submit(cs, sizeof(*op));
 }
@@ -1663,8 +1672,7 @@ static UINT wined3d_cs_exec_swap_mem(struct wined3d_cs *cs, const void *data)
     const struct wined3d_cs_swap_mem *op = data;
     struct wined3d_buffer *buffer = op->buffer;
 
-    wined3d_resource_free_sysmem(&buffer->resource);
-    buffer->resource.heap_memory = op->mem;
+    buffer_swap_mem(buffer, op->mem);
 
     if (!buffer->buffer_object && buffer->resource.bind_count)
     {

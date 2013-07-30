@@ -32,9 +32,10 @@ WINE_DEFAULT_DEBUG_CHANNEL(d3d);
 #define WINED3D_BUFFER_HASDESC      0x01    /* A vertex description has been found. */
 #define WINED3D_BUFFER_CREATEBO     0x02    /* Create a buffer object for this buffer. */
 #define WINED3D_BUFFER_DOUBLEBUFFER 0x04    /* Keep both a buffer object and a system memory copy for this buffer. */
-#define WINED3D_BUFFER_DISCARD      0x08    /* A DISCARD lock has occurred since the last preload. */
+#define WINED3D_BUFFER_DISCARD      0x08    /* The next PreLoad may discard the buffer contents. */
 #define WINED3D_BUFFER_NOSYNC       0x10    /* All locks since the last preload had NOOVERWRITE set. */
 #define WINED3D_BUFFER_APPLESYNC    0x20    /* Using sync as in GL_APPLE_flush_buffer_range. */
+#define WINED3D_BUFFER_DISCARDED    0x40    /* The buffer has been discarded since the last draw. */
 
 #define VB_MAXDECLCHANGES     100     /* After that number of decl changes we stop converting */
 #define VB_RESETDECLCHANGE    1000    /* Reset the decl changecount after that number of draws */
@@ -926,7 +927,7 @@ HRESULT CDECL wined3d_buffer_map(struct wined3d_buffer *buffer, UINT offset, UIN
      * previous contents of the buffer. The r600g driver only does this when
      * the buffer is currently in use, while the proprietary NVIDIA driver
      * appears to do this unconditionally. */
-    if (buffer->flags & WINED3D_BUFFER_DISCARD)
+    if (buffer->flags & WINED3D_BUFFER_DISCARDED)
         flags &= ~WINED3D_MAP_DISCARD;
     count = ++buffer->resource.map_count;
 
@@ -1011,14 +1012,26 @@ HRESULT CDECL wined3d_buffer_map(struct wined3d_buffer *buffer, UINT offset, UIN
                 context_release(context);
             }
         }
+        else if(!wined3d_settings.cs_multithreaded)
+        {
+            if (flags & WINED3D_MAP_DISCARD)
+                buffer->flags |= WINED3D_BUFFER_DISCARD;
 
+            if (buffer_is_dirty(buffer))
+            {
+                if (buffer->flags & WINED3D_BUFFER_NOSYNC && !(flags & WINED3D_MAP_NOOVERWRITE))
+                {
+                    buffer->flags &= ~WINED3D_BUFFER_NOSYNC;
+                }
+            }
+            else if(flags & WINED3D_MAP_NOOVERWRITE)
+            {
+                buffer->flags |= WINED3D_BUFFER_NOSYNC;
+            }
+        }
         if (flags & WINED3D_MAP_DISCARD)
-            buffer->flags |= WINED3D_BUFFER_DISCARD;
+            buffer->flags |= WINED3D_BUFFER_DISCARDED;
 
-        if (!(flags & WINED3D_MAP_NOOVERWRITE))
-            buffer->flags &= ~WINED3D_BUFFER_NOSYNC;
-        else if (!buffer_is_dirty(buffer))
-            buffer->flags |= WINED3D_BUFFER_NOSYNC;
     }
 
     if (wined3d_settings.cs_multithreaded && count == 1)
@@ -1331,4 +1344,11 @@ HRESULT CDECL wined3d_buffer_create_ib(struct wined3d_device *device, UINT size,
     *buffer = object;
 
     return WINED3D_OK;
+}
+
+void buffer_swap_mem(struct wined3d_buffer *buffer, BYTE *mem)
+{
+    wined3d_resource_free_sysmem(&buffer->resource);
+    buffer->resource.heap_memory = mem;
+    buffer->flags |= WINED3D_BUFFER_DISCARD;
 }
