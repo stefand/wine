@@ -2361,7 +2361,7 @@ void get_drawable_size_fbo(const struct wined3d_context *context, UINT *width, U
 
 void draw_textured_quad(const struct wined3d_surface *src_surface, struct wined3d_context *context,
         const RECT *src_rect, const RECT *dst_rect, enum wined3d_texture_filter_type filter) DECLSPEC_HIDDEN;
-void flip_surface(struct wined3d_surface *front, struct wined3d_surface *back) DECLSPEC_HIDDEN;
+void surface_flip(struct wined3d_surface *front, struct wined3d_surface *back) DECLSPEC_HIDDEN;
 
 /* Surface flags: */
 #define SFLAG_CONVERTED         0x00000001 /* Converted for color keying or palettized. */
