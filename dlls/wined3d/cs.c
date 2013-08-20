@@ -64,6 +64,7 @@ enum wined3d_cs_op
     WINED3D_CS_OP_SET_MATERIAL,
     WINED3D_CS_OP_RESET_STATE,
     WINED3D_CS_OP_STATEBLOCK,
+    WINED3D_CS_OP_PUSH_CONSTANTS,
     WINED3D_CS_OP_STOP,
 };
 
@@ -278,6 +279,14 @@ struct wined3d_cs_stateblock
 {
     enum wined3d_cs_op opcode;
     struct wined3d_state state;
+};
+
+struct wined3d_cs_push_constants
+{
+    enum wined3d_cs_op opcode;
+    enum wined3d_push_constants p;
+    unsigned int start_idx, count;
+    char constants[4];
 };
 
 /* FIXME: The list synchronization probably isn't particularly fast. */
@@ -1260,6 +1269,53 @@ void wined3d_cs_emit_reset_state(struct wined3d_cs *cs)
     cs->ops->submit(cs);
 }
 
+static const struct
+{
+    size_t offset;
+    size_t size;
+    DWORD mask;
+}
+push_constant_info[] =
+{
+    /* WINED3D_PUSH_CONSTANTS_VS_F */
+    {FIELD_OFFSET(struct wined3d_state, vs_consts_f), sizeof(struct wined3d_vec4),  WINED3D_SHADER_CONST_VS_F},
+    /* WINED3D_PUSH_CONSTANTS_PS_F */
+    {FIELD_OFFSET(struct wined3d_state, ps_consts_f), sizeof(struct wined3d_vec4),  WINED3D_SHADER_CONST_PS_F},
+    /* WINED3D_PUSH_CONSTANTS_VS_I */
+    {FIELD_OFFSET(struct wined3d_state, vs_consts_i), sizeof(struct wined3d_ivec4), WINED3D_SHADER_CONST_VS_I},
+    /* WINED3D_PUSH_CONSTANTS_PS_I */
+    {FIELD_OFFSET(struct wined3d_state, ps_consts_i), sizeof(struct wined3d_ivec4), WINED3D_SHADER_CONST_PS_I},
+    /* WINED3D_PUSH_CONSTANTS_VS_B */
+    {FIELD_OFFSET(struct wined3d_state, vs_consts_b), sizeof(BOOL),                 WINED3D_SHADER_CONST_VS_B},
+    /* WINED3D_PUSH_CONSTANTS_PS_B */
+    {FIELD_OFFSET(struct wined3d_state, ps_consts_b), sizeof(BOOL),                 WINED3D_SHADER_CONST_PS_B},
+};
+
+static UINT wined3d_cs_exec_push_constants(struct wined3d_cs *cs, const void *data)
+{
+    const struct wined3d_cs_push_constants *op = data;
+    struct wined3d_device *device = cs->device;
+    size_t offset;
+    unsigned int i, context_count;
+    enum wined3d_push_constants p = op->p;
+    size_t data_size = push_constant_info[p].size * op->count;
+    size_t op_size = FIELD_OFFSET(struct wined3d_cs_push_constants, constants[data_size]);
+
+    if (p == WINED3D_PUSH_CONSTANTS_VS_F)
+        device->shader_backend->shader_update_float_vertex_constants(cs->device, op->start_idx, op->count);
+    else if (p == WINED3D_PUSH_CONSTANTS_PS_F)
+        device->shader_backend->shader_update_float_pixel_constants(cs->device, op->start_idx, op->count);
+
+    offset = push_constant_info[p].offset + op->start_idx * push_constant_info[p].size;
+    memcpy((BYTE *)&cs->state + offset, op->constants, data_size);
+    for (i = 0, context_count = device->context_count; i < context_count; ++i)
+    {
+        device->contexts[i]->constant_update_mask |= push_constant_info[p].mask;
+    }
+
+    return op_size;
+}
+
 static UINT (* const wined3d_cs_op_handlers[])(struct wined3d_cs *cs, const void *data) =
 {
     /* WINED3D_CS_OP_FENCE                      */ wined3d_cs_exec_fence,
@@ -1290,6 +1346,7 @@ static UINT (* const wined3d_cs_op_handlers[])(struct wined3d_cs *cs, const void
     /* WINED3D_CS_OP_SET_MATERIAL               */ wined3d_cs_exec_set_material,
     /* WINED3D_CS_OP_RESET_STATE                */ wined3d_cs_exec_reset_state,
     /* WINED3D_CS_OP_STATEBLOCK                 */ wined3d_cs_exec_transfer_stateblock,
+    /* WINED3D_CS_OP_PUSH_CONSTANTS             */ wined3d_cs_exec_push_constants,
 };
 
 static void *wined3d_cs_st_require_space(struct wined3d_cs *cs, size_t size)
@@ -1324,28 +1381,6 @@ static void wined3d_cs_st_push_constants(struct wined3d_cs *cs, enum wined3d_pus
     unsigned int i;
     size_t offset;
 
-    static const struct
-    {
-        size_t offset;
-        size_t size;
-        DWORD mask;
-    }
-    push_constant_info[] =
-    {
-        /* WINED3D_PUSH_CONSTANTS_VS_F */
-        {FIELD_OFFSET(struct wined3d_state, vs_consts_f), sizeof(struct wined3d_vec4),  WINED3D_SHADER_CONST_VS_F},
-        /* WINED3D_PUSH_CONSTANTS_PS_F */
-        {FIELD_OFFSET(struct wined3d_state, ps_consts_f), sizeof(struct wined3d_vec4),  WINED3D_SHADER_CONST_PS_F},
-        /* WINED3D_PUSH_CONSTANTS_VS_I */
-        {FIELD_OFFSET(struct wined3d_state, vs_consts_i), sizeof(struct wined3d_ivec4), WINED3D_SHADER_CONST_VS_I},
-        /* WINED3D_PUSH_CONSTANTS_PS_I */
-        {FIELD_OFFSET(struct wined3d_state, ps_consts_i), sizeof(struct wined3d_ivec4), WINED3D_SHADER_CONST_PS_I},
-        /* WINED3D_PUSH_CONSTANTS_VS_B */
-        {FIELD_OFFSET(struct wined3d_state, vs_consts_b), sizeof(BOOL),                 WINED3D_SHADER_CONST_VS_B},
-        /* WINED3D_PUSH_CONSTANTS_PS_B */
-        {FIELD_OFFSET(struct wined3d_state, ps_consts_b), sizeof(BOOL),                 WINED3D_SHADER_CONST_PS_B},
-    };
-
     if (p == WINED3D_PUSH_CONSTANTS_VS_F)
         device->shader_backend->shader_update_float_vertex_constants(device, start_idx, count);
     else if (p == WINED3D_PUSH_CONSTANTS_PS_F)
@@ -1359,6 +1394,21 @@ static void wined3d_cs_st_push_constants(struct wined3d_cs *cs, enum wined3d_pus
     }
 }
 
+static void wined3d_cs_mt_push_constants(struct wined3d_cs *cs, enum wined3d_push_constants p,
+        unsigned int start_idx, unsigned int count, const void *constants)
+{
+    size_t data_size = push_constant_info[p].size * count;
+    size_t op_size = FIELD_OFFSET(struct wined3d_cs_push_constants, constants[data_size]);
+    struct wined3d_cs_push_constants *op = cs->ops->require_space(cs, op_size);
+
+    op->opcode = WINED3D_CS_OP_PUSH_CONSTANTS;
+    op->p = p;
+    op->start_idx = start_idx;
+    op->count = count;
+    memcpy(op->constants, constants, data_size);
+
+    cs->ops->submit(cs);
+}
 static const struct wined3d_cs_ops wined3d_cs_st_ops =
 {
     wined3d_cs_st_require_space,
@@ -1372,7 +1422,7 @@ static const struct wined3d_cs_ops wined3d_cs_mt_ops =
     wined3d_cs_mt_require_space,
     wined3d_cs_flush_and_wait,
     wined3d_cs_flush_and_wait,
-    wined3d_cs_st_push_constants,
+    wined3d_cs_mt_push_constants,
 };
 
 /* FIXME: wined3d_device_uninit_3d() should either flush and wait, or be an
