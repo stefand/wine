@@ -595,6 +595,7 @@ static UINT wined3d_cs_exec_draw(struct wined3d_cs *cs, const void *data)
 {
     const struct wined3d_cs_draw *op = data;
     const struct wined3d_gl_info *gl_info = &cs->device->adapter->gl_info;
+    unsigned int i;
 
     if (op->indexed && !gl_info->supported[ARB_DRAW_ELEMENTS_BASE_VERTEX])
     {
@@ -613,6 +614,14 @@ static UINT wined3d_cs_exec_draw(struct wined3d_cs *cs, const void *data)
     draw_primitive(cs->device, &cs->state, op->start_idx, op->index_count,
             op->start_instance, op->instance_count, op->indexed);
 
+    if (op->indexed)
+        wined3d_resource_dec_fence(&cs->state.index_buffer->resource);
+    for (i = 0; i < sizeof(cs->state.streams) / sizeof(*cs->state.streams); i++)
+    {
+        if (cs->state.streams[i].buffer)
+            wined3d_resource_dec_fence(&cs->state.streams[i].buffer->resource);
+    }
+
     return sizeof(*op);
 }
 
@@ -623,6 +632,7 @@ void wined3d_cs_emit_draw(struct wined3d_cs *cs, UINT start_idx, UINT index_coun
 
     struct wined3d_cs_draw *op;
     unsigned int i;
+    const struct wined3d_state *state = &cs->device->state;
 
     op = cs->ops->require_space(cs, sizeof(*op));
     op->opcode = WINED3D_CS_OP_DRAW;
@@ -633,10 +643,18 @@ void wined3d_cs_emit_draw(struct wined3d_cs *cs, UINT start_idx, UINT index_coun
     op->indexed = indexed;
 
     if (indexed)
-        cs->device->state.index_buffer->flags &= ~WINED3D_BUFFER_DISCARDED;
-    for (i = 0; i < 16; i++)
-        if (cs->device->state.streams[i].buffer)
-            cs->device->state.streams[i].buffer->flags &= ~WINED3D_BUFFER_DISCARDED;
+    {
+        wined3d_resource_inc_fence(&state->index_buffer->resource);
+        state->index_buffer->flags &= ~WINED3D_BUFFER_DISCARDED;
+    }
+    for (i = 0; i < sizeof(state->streams) / sizeof(*state->streams); i++)
+    {
+        if (state->streams[i].buffer)
+        {
+            wined3d_resource_inc_fence(&state->streams[i].buffer->resource);
+            state->streams[i].buffer->flags &= ~WINED3D_BUFFER_DISCARDED;
+        }
+    }
 
     cs->ops->submit(cs, sizeof(*op));
 }

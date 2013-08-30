@@ -2071,6 +2071,7 @@ struct wined3d_resource
     GLuint buffer_object;
     UINT custom_row_pitch, custom_slice_pitch;
     struct list resource_list_entry;
+    LONG access_fence;
     DWORD locations, map_binding, draw_binding;
 
     void *parent;
@@ -2116,6 +2117,21 @@ HRESULT wined3d_resource_map(struct wined3d_resource *resource, struct wined3d_m
 void *wined3d_resource_map_internal(struct wined3d_resource *resource, DWORD flags) DECLSPEC_HIDDEN;
 HRESULT wined3d_resource_unmap(struct wined3d_resource *resource) DECLSPEC_HIDDEN;
 void wined3d_resource_unmap_internal(struct wined3d_resource *resource) DECLSPEC_HIDDEN;
+
+static inline void wined3d_resource_inc_fence(struct wined3d_resource *resource)
+{
+    InterlockedIncrement(&resource->access_fence);
+}
+
+static inline void wined3d_resource_dec_fence(struct wined3d_resource *resource)
+{
+    InterlockedDecrement(&resource->access_fence);
+}
+
+static inline void wined3d_resource_wait_fence(struct wined3d_resource *resource)
+{
+    while(InterlockedCompareExchange(&resource->access_fence, 0, 0));
+}
 
 /* Tests show that the start address of resources is 32 byte aligned */
 #define RESOURCE_ALIGNMENT 16
