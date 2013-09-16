@@ -2051,6 +2051,8 @@ void wined3d_resource_release_map_ptr(const struct wined3d_resource *resource,
 BOOL wined3d_resource_prepare_system_memory(struct wined3d_resource *resource) DECLSPEC_HIDDEN;
 BOOL wined3d_resource_prepare_map_memory(struct wined3d_resource *resource,
         struct wined3d_context *context) DECLSPEC_HIDDEN;
+void wined3d_resource_get_memory(const struct wined3d_resource *resource,
+        DWORD location, struct wined3d_bo_address *data) DECLSPEC_HIDDEN;
 
 /* Tests show that the start address of resources is 32 byte aligned */
 #define RESOURCE_ALIGNMENT 16
