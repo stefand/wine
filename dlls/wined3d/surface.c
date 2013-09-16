@@ -2035,19 +2035,17 @@ static void surface_allocate_surface(struct wined3d_surface *surface, const stru
 
     if (gl_info->supported[APPLE_CLIENT_STORAGE])
     {
-        if (surface->flags & (SFLAG_NONPOW2 | SFLAG_DIBSECTION | SFLAG_CONVERTED)
-                || !surface->resource.heap_memory)
+        if (surface->flags & (SFLAG_NONPOW2 | SFLAG_DIBSECTION | SFLAG_CONVERTED))
         {
             /* In some cases we want to disable client storage.
              * SFLAG_NONPOW2 has a bigger opengl texture than the client memory, and different pitches
              * SFLAG_DIBSECTION: Dibsections may have read / write protections on the memory. Avoid issues...
-             * SFLAG_CONVERTED: The conversion destination memory is freed after loading the surface
-             * heap_memory == NULL: Not defined in the extension. Seems to disable client storage effectively
-             */
+             * SFLAG_CONVERTED: The conversion destination memory is freed after loading the surface */
             surface->flags &= ~SFLAG_CLIENT;
         }
         else
         {
+            surface_prepare_system_memory(surface);
             surface->flags |= SFLAG_CLIENT;
             mem = surface->resource.heap_memory;
 
