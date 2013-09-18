@@ -332,7 +332,7 @@ static void wined3d_volume_load_location(struct wined3d_resource *resource,
             break;
 
         case WINED3D_LOCATION_BUFFER:
-            if (!volume->pbo || !(volume->flags & WINED3D_VFLAG_PBO))
+            if (!volume->pbo || volume->resource.map_binding != WINED3D_LOCATION_BUFFER)
                 ERR("Trying to load WINED3D_LOCATION_BUFFER without setting it up first.\n");
 
             if (volume->resource.locations & WINED3D_LOCATION_DISCARDED)
@@ -586,12 +586,67 @@ static BOOL wined3d_volume_check_box_dimensions(const struct wined3d_volume *vol
     return TRUE;
 }
 
+/* Context activation is done by the caller. */
+static BOOL wined3d_volume_prepare_map_memory(struct wined3d_volume *volume, struct wined3d_context *context)
+{
+    switch (volume->resource.map_binding)
+    {
+        case WINED3D_LOCATION_BUFFER:
+            wined3d_volume_prepare_pbo(volume, context);
+            return TRUE;
+
+        case WINED3D_LOCATION_SYSMEM:
+            return volume_prepare_system_memory(volume);
+
+        default:
+            ERR("Unexpected map binding %s.\n", wined3d_debug_location(volume->resource.map_binding));
+            return FALSE;
+    }
+}
+
+static BYTE *wined3d_volume_get_map_ptr(const struct wined3d_volume *volume,
+        const struct wined3d_context *context, DWORD flags)
+{
+    const struct wined3d_gl_info *gl_info;
+    BYTE *ptr;
+
+    switch (volume->resource.map_binding)
+    {
+        case WINED3D_LOCATION_BUFFER:
+            gl_info = context->gl_info;
+            GL_EXTCALL(glBindBufferARB(GL_PIXEL_UNPACK_BUFFER_ARB, volume->pbo));
+
+            if (gl_info->supported[ARB_MAP_BUFFER_RANGE])
+            {
+                GLbitfield mapflags = wined3d_resource_gl_map_flags(flags);
+                mapflags &= ~GL_MAP_FLUSH_EXPLICIT_BIT;
+                ptr = GL_EXTCALL(glMapBufferRange(GL_PIXEL_UNPACK_BUFFER_ARB,
+                        0, volume->resource.size, mapflags));
+            }
+            else
+            {
+                GLenum access = wined3d_resource_gl_legacy_map_flags(flags);
+                ptr = GL_EXTCALL(glMapBufferARB(GL_PIXEL_UNPACK_BUFFER_ARB, access));
+            }
+
+            GL_EXTCALL(glBindBufferARB(GL_PIXEL_UNPACK_BUFFER_ARB, 0));
+            checkGLcall("Map PBO");
+            return ptr;
+
+        case WINED3D_LOCATION_SYSMEM:
+            return volume->resource.heap_memory;
+
+        default:
+            ERR("Unexpected map binding %s.\n", wined3d_debug_location(volume->resource.map_binding));
+            return NULL;
+    }
+}
+
 HRESULT CDECL wined3d_volume_map(struct wined3d_volume *volume,
         struct wined3d_map_desc *map_desc, const struct wined3d_box *box, DWORD flags)
 {
     struct wined3d_device *device = volume->resource.device;
     struct wined3d_context *context;
-    const struct wined3d_gl_info *gl_info;
     BYTE *base_memory;
     const struct wined3d_format *format = volume->resource.format;
 
@@ -623,58 +678,22 @@ HRESULT CDECL wined3d_volume_map(struct wined3d_volume *volume,
 
     flags = wined3d_resource_sanitize_map_flags(&volume->resource, flags);
 
-    if (volume->flags & WINED3D_VFLAG_PBO)
+    context = context_acquire(device, NULL);
+    if (!wined3d_volume_prepare_map_memory(volume, context))
     {
-        context = context_acquire(device, NULL);
-        gl_info = context->gl_info;
-
-        wined3d_volume_prepare_pbo(volume, context);
-        if (flags & WINED3D_MAP_DISCARD)
-            wined3d_resource_validate_location(&volume->resource, WINED3D_LOCATION_BUFFER);
-        else
-            wined3d_resource_load_location(&volume->resource, context, WINED3D_LOCATION_BUFFER);
-
-        GL_EXTCALL(glBindBufferARB(GL_PIXEL_UNPACK_BUFFER_ARB, volume->pbo));
-
-        if (gl_info->supported[ARB_MAP_BUFFER_RANGE])
-        {
-            GLbitfield mapflags = wined3d_resource_gl_map_flags(flags);
-            mapflags &= ~GL_MAP_FLUSH_EXPLICIT_BIT;
-            base_memory = GL_EXTCALL(glMapBufferRange(GL_PIXEL_UNPACK_BUFFER_ARB,
-                    0, volume->resource.size, mapflags));
-        }
-        else
-        {
-            GLenum access = wined3d_resource_gl_legacy_map_flags(flags);
-            base_memory = GL_EXTCALL(glMapBufferARB(GL_PIXEL_UNPACK_BUFFER_ARB, access));
-        }
-
-        GL_EXTCALL(glBindBufferARB(GL_PIXEL_UNPACK_BUFFER_ARB, 0));
-        checkGLcall("Map PBO");
-
+        WARN("Out of memory.\n");
+        map_desc->data = NULL;
         context_release(context);
+        return E_OUTOFMEMORY;
     }
-    else
-    {
-        if (!volume_prepare_system_memory(volume))
-        {
-            WARN("Out of memory.\n");
-            map_desc->data = NULL;
-            return E_OUTOFMEMORY;
-        }
 
-        if (flags & WINED3D_MAP_DISCARD)
-        {
-            wined3d_resource_validate_location(&volume->resource, WINED3D_LOCATION_SYSMEM);
-        }
-        else if (!(volume->resource.locations & WINED3D_LOCATION_SYSMEM))
-        {
-            context = context_acquire(device, NULL);
-            wined3d_resource_load_location(&volume->resource, context, WINED3D_LOCATION_SYSMEM);
-            context_release(context);
-        }
-        base_memory = volume->resource.heap_memory;
-    }
+    if (flags & WINED3D_MAP_DISCARD)
+        wined3d_resource_validate_location(&volume->resource, volume->resource.map_binding);
+    else
+        wined3d_resource_load_location(&volume->resource, context, volume->resource.map_binding);
+
+    base_memory = wined3d_volume_get_map_ptr(volume, context, flags);
+    context_release(context);
 
     TRACE("Base memory pointer %p.\n", base_memory);
 
@@ -717,12 +736,7 @@ HRESULT CDECL wined3d_volume_map(struct wined3d_volume *volume,
     }
 
     if (!(flags & (WINED3D_MAP_NO_DIRTY_UPDATE | WINED3D_MAP_READONLY)))
-    {
-        if (volume->flags & WINED3D_VFLAG_PBO)
-            wined3d_resource_invalidate_location(&volume->resource, ~WINED3D_LOCATION_BUFFER);
-        else
-            wined3d_resource_invalidate_location(&volume->resource, ~WINED3D_LOCATION_SYSMEM);
-    }
+        wined3d_resource_invalidate_location(&volume->resource, ~volume->resource.map_binding);
 
     volume->resource.map_count++;
 
@@ -737,8 +751,34 @@ struct wined3d_volume * CDECL wined3d_volume_from_resource(struct wined3d_resour
     return volume_from_resource(resource);
 }
 
+static void wined3d_volume_release_map_ptr(const struct wined3d_volume *volume,
+        const struct wined3d_context *context)
+{
+    const struct wined3d_gl_info *gl_info;
+
+    switch (volume->resource.map_binding)
+    {
+        case WINED3D_LOCATION_BUFFER:
+            gl_info = context->gl_info;
+            GL_EXTCALL(glBindBufferARB(GL_PIXEL_UNPACK_BUFFER_ARB, volume->pbo));
+            GL_EXTCALL(glUnmapBufferARB(GL_PIXEL_UNPACK_BUFFER_ARB));
+            GL_EXTCALL(glBindBufferARB(GL_PIXEL_UNPACK_BUFFER_ARB, 0));
+            checkGLcall("Unmap PBO");
+            return;
+
+        case WINED3D_LOCATION_SYSMEM:
+            return;
+
+        default:
+            ERR("Unexpected map binding %s.\n", wined3d_debug_location(volume->resource.map_binding));
+            return;
+    }
+}
+
 HRESULT CDECL wined3d_volume_unmap(struct wined3d_volume *volume)
 {
+    struct wined3d_device *device = volume->resource.device;
+    struct wined3d_context *context;
     TRACE("volume %p.\n", volume);
 
     if (!volume->resource.map_count)
@@ -747,19 +787,9 @@ HRESULT CDECL wined3d_volume_unmap(struct wined3d_volume *volume)
         return WINED3DERR_INVALIDCALL;
     }
 
-    if (volume->flags & WINED3D_VFLAG_PBO)
-    {
-        struct wined3d_device *device = volume->resource.device;
-        struct wined3d_context *context = context_acquire(device, NULL);
-        const struct wined3d_gl_info *gl_info = context->gl_info;
-
-        GL_EXTCALL(glBindBufferARB(GL_PIXEL_UNPACK_BUFFER_ARB, volume->pbo));
-        GL_EXTCALL(glUnmapBufferARB(GL_PIXEL_UNPACK_BUFFER_ARB));
-        GL_EXTCALL(glBindBufferARB(GL_PIXEL_UNPACK_BUFFER_ARB, 0));
-        checkGLcall("Unmap PBO");
-
-        context_release(context);
-    }
+    context = context_acquire(device, NULL);
+    wined3d_volume_release_map_ptr(volume, context);
+    context_release(context);
 
     volume->resource.map_count--;
 
@@ -816,13 +846,14 @@ static HRESULT volume_init(struct wined3d_volume *volume, struct wined3d_texture
 
     volume->texture_level = level;
     volume->resource.locations = WINED3D_LOCATION_DISCARDED;
+    volume->resource.map_binding = WINED3D_LOCATION_SYSMEM;
 
     if (desc->pool == WINED3D_POOL_DEFAULT && desc->usage & WINED3DUSAGE_DYNAMIC
             && gl_info->supported[ARB_PIXEL_BUFFER_OBJECT]
             && !format->convert)
     {
         wined3d_resource_free_sysmem(&volume->resource);
-        volume->flags |= WINED3D_VFLAG_PBO;
+        volume->resource.map_binding = WINED3D_LOCATION_BUFFER;
     }
 
     volume_set_container(volume, container);
