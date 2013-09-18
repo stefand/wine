@@ -2031,7 +2031,7 @@ struct wined3d_resource
     DWORD priority;
     void *heap_memory, *user_memory, *bitmap_data;
     struct list resource_list_entry;
-    DWORD locations;
+    DWORD locations, map_binding;
 
     void *parent;
     const struct wined3d_parent_ops *parent_ops;
@@ -2230,7 +2230,7 @@ struct wined3d_surface
     struct wined3d_texture *container;
     struct wined3d_swapchain *swapchain;
     struct wined3d_palette *palette; /* D3D7 style palette handling */
-    DWORD draw_binding, map_binding;
+    DWORD draw_binding;
 
     DWORD flags;
 
