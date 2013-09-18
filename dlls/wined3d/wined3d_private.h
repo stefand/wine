@@ -2032,7 +2032,6 @@ struct wined3d_resource
     DWORD usage;
     enum wined3d_pool pool;
     DWORD access_flags;
-    DWORD draw_binding;
     UINT width;
     UINT height;
     UINT depth;
@@ -2040,7 +2039,7 @@ struct wined3d_resource
     DWORD priority;
     void *heap_memory, *user_memory, *bitmap_data;
     struct list resource_list_entry;
-    DWORD locations;
+    DWORD locations, map_binding, draw_binding;
 
     void *parent;
     const struct wined3d_parent_ops *parent_ops;
@@ -2235,7 +2234,6 @@ struct wined3d_surface
     const struct wined3d_surface_ops *surface_ops;
     struct wined3d_texture *container;
     struct wined3d_swapchain *swapchain;
-    DWORD map_binding;
 
     DWORD flags;
 
