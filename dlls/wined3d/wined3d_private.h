@@ -2080,6 +2080,9 @@ void wined3d_resource_get_memory(const struct wined3d_resource *resource,
 BOOL wined3d_resource_check_block_align(const struct wined3d_resource *resource,
         const struct wined3d_box *box) DECLSPEC_HIDDEN;
 void wined3d_resource_free_bo(struct wined3d_resource *resource) DECLSPEC_HIDDEN;
+HRESULT wined3d_resource_map(struct wined3d_resource *resource, struct wined3d_map_desc *map_desc,
+        const struct wined3d_box *box, DWORD flags) DECLSPEC_HIDDEN;
+HRESULT wined3d_resource_unmap(struct wined3d_resource *resource) DECLSPEC_HIDDEN;
 
 /* Tests show that the start address of resources is 32 byte aligned */
 #define RESOURCE_ALIGNMENT 16
