@@ -611,6 +611,17 @@ static void swapchain_gl_present(struct wined3d_swapchain *swapchain,
         wined3d_texture_validate_location(swapchain->back_buffers[swapchain->desc.backbuffer_count - 1],
                 0, WINED3D_LOCATION_DISCARDED);
 
+    switch (swapchain->desc.swap_effect)
+    {
+        case WINED3D_SWAP_EFFECT_DISCARD:
+            wined3d_texture_validate_location(swapchain->back_buffers[swapchain->desc.backbuffer_count - 1],
+                    0, WINED3D_LOCATION_DISCARDED);
+            break;
+
+        default:
+            break;
+    }
+
     if (fb->depth_stencil)
     {
         struct wined3d_surface *ds = wined3d_rendertarget_view_get_surface(fb->depth_stencil);
