@@ -6242,6 +6242,10 @@ void ddraw_surface_init(struct ddraw_surface *surface, struct ddraw *ddraw,
     struct ddraw_texture *texture = wined3d_texture_get_parent(wined3d_texture);
     DDSURFACEDESC2 *desc = &surface->surface_desc;
     unsigned int version = texture->version;
+    UINT row_pitch, slice_pitch;
+    struct wined3d_resource *resource = wined3d_surface_get_resource(wined3d_surface);
+
+    wined3d_resource_get_pitch(resource, &row_pitch, &slice_pitch);
 
     surface->IDirectDrawSurface7_iface.lpVtbl = &ddraw_surface7_vtbl;
     surface->IDirectDrawSurface4_iface.lpVtbl = &ddraw_surface4_vtbl;
@@ -6279,14 +6283,16 @@ void ddraw_surface_init(struct ddraw_surface *surface, struct ddraw *ddraw,
         if (desc->dwFlags & DDSD_LPSURFACE)
             desc->u1.dwLinearSize = ~0u;
         else
-            desc->u1.dwLinearSize = wined3d_surface_get_pitch(wined3d_surface) * ((desc->dwHeight + 3) / 4);
+        {
+            desc->u1.dwLinearSize = row_pitch * ((desc->dwHeight + 3) / 4);
+        }
         desc->dwFlags |= DDSD_LINEARSIZE;
         desc->dwFlags &= ~(DDSD_LPSURFACE | DDSD_PITCH);
     }
     else
     {
         if (!(desc->dwFlags & DDSD_LPSURFACE))
-            desc->u1.lPitch = wined3d_surface_get_pitch(wined3d_surface);
+            desc->u1.lPitch = row_pitch;
         desc->dwFlags |= DDSD_PITCH;
         desc->dwFlags &= ~(DDSD_LPSURFACE | DDSD_LINEARSIZE);
     }

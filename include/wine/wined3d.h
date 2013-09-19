@@ -2421,6 +2421,8 @@ static inline HRESULT wined3d_private_store_set_private_data(struct wined3d_priv
 void __cdecl wined3d_resource_get_desc(const struct wined3d_resource *resource,
         struct wined3d_resource_desc *desc);
 void * __cdecl wined3d_resource_get_parent(const struct wined3d_resource *resource);
+void __cdecl wined3d_resource_get_pitch(const struct wined3d_resource *resource, UINT *row_pitch,
+        UINT *slice_pitch);
 DWORD __cdecl wined3d_resource_get_priority(const struct wined3d_resource *resource);
 HRESULT __cdecl wined3d_resource_map(struct wined3d_resource *resource, unsigned int sub_resource_idx,
         struct wined3d_map_desc *map_desc, const struct wined3d_box *box, DWORD flags);
@@ -2476,7 +2478,7 @@ ULONG __cdecl wined3d_stateblock_incref(struct wined3d_stateblock *stateblock);
 
 HRESULT __cdecl wined3d_surface_get_overlay_position(const struct wined3d_surface *surface, LONG *x, LONG *y);
 void * __cdecl wined3d_surface_get_parent(const struct wined3d_surface *surface);
-DWORD __cdecl wined3d_surface_get_pitch(const struct wined3d_surface *surface);
+struct wined3d_resource * __cdecl wined3d_surface_get_resource(struct wined3d_surface *surface);
 HRESULT __cdecl wined3d_surface_set_overlay_position(struct wined3d_surface *surface, LONG x, LONG y);
 HRESULT __cdecl wined3d_surface_update_overlay(struct wined3d_surface *surface, const RECT *src_rect,
         struct wined3d_surface *dst_surface, const RECT *dst_rect, DWORD flags, const WINEDDOVERLAYFX *fx);
