@@ -787,31 +787,22 @@ static void surface_realize_palette(struct wined3d_surface *surface)
     context_release(context);
 }
 
-static void surface_unmap(struct wined3d_surface *surface)
+static void surface_frontbuffer_updated(struct wined3d_surface *surface)
 {
-    TRACE("surface %p.\n", surface);
+    struct wined3d_context *context = NULL;
+    struct wined3d_device *device = surface->resource.device;
 
-    memset(&surface->lockedRect, 0, sizeof(surface->lockedRect));
-
-    if (surface->resource.locations & (WINED3D_LOCATION_DRAWABLE | WINED3D_LOCATION_TEXTURE_RGB))
+    if (surface->resource.locations & WINED3D_LOCATION_DRAWABLE)
     {
         TRACE("Not dirtified, nothing to do.\n");
         return;
     }
 
-    if (surface->swapchain && surface->swapchain->front_buffer == surface)
-    {
-        struct wined3d_device *device = surface->resource.device;
-        struct wined3d_context *context = NULL;
-
-        if (device->d3d_initialized)
-            context = context_acquire(device, surface);
-        wined3d_resource_load_location(&surface->resource, context, surface->draw_binding);
-        if (context)
-            context_release(context);
-    }
-    else if (surface->resource.format->flags & (WINED3DFMT_FLAG_DEPTH | WINED3DFMT_FLAG_STENCIL))
-        FIXME("Depth / stencil buffer locking is not implemented.\n");
+    if (device->d3d_initialized)
+        context = context_acquire(surface->resource.device, NULL);
+    wined3d_resource_load_location(&surface->resource, context, surface->draw_binding);
+    if (context)
+        context_release(context);
 }
 
 static BOOL surface_is_full_rect(const struct wined3d_surface *surface, const RECT *r)
@@ -1314,7 +1305,7 @@ static const struct wined3d_surface_ops surface_ops =
 {
     surface_private_setup,
     surface_realize_palette,
-    surface_unmap,
+    surface_frontbuffer_updated,
 };
 
 /*****************************************************************************
@@ -1390,22 +1381,16 @@ static void gdi_surface_realize_palette(struct wined3d_surface *surface)
         x11_copy_to_screen(surface->swapchain, NULL);
 }
 
-static void gdi_surface_unmap(struct wined3d_surface *surface)
+static void gdi_surface_frontbuffer_updated(struct wined3d_surface *surface)
 {
-    TRACE("surface %p.\n", surface);
-
-    /* Tell the swapchain to update the screen. */
-    if (surface->swapchain && surface == surface->swapchain->front_buffer)
-        x11_copy_to_screen(surface->swapchain, &surface->lockedRect);
-
-    memset(&surface->lockedRect, 0, sizeof(RECT));
+    x11_copy_to_screen(surface->swapchain, &surface->lockedRect);
 }
 
 static const struct wined3d_surface_ops gdi_surface_ops =
 {
     gdi_surface_private_setup,
     gdi_surface_realize_palette,
-    gdi_surface_unmap,
+    gdi_surface_frontbuffer_updated,
 };
 
 void surface_set_texture_target(struct wined3d_surface *surface, GLenum target, GLint level)
@@ -3007,7 +2992,9 @@ HRESULT CDECL wined3d_surface_unmap(struct wined3d_surface *surface)
     if (context)
         context_release(context);
 
-    surface->surface_ops->surface_unmap(surface);
+    if (surface->swapchain && surface == surface->swapchain->front_buffer)
+        surface->surface_ops->surface_frontbuffer_updated(surface);
+    memset(&surface->lockedRect, 0, sizeof(surface->lockedRect));
 
     return WINED3D_OK;
 }
