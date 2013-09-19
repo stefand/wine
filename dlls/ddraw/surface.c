@@ -6131,6 +6131,10 @@ HRESULT ddraw_surface_init(struct ddraw_surface *surface, struct ddraw *ddraw, s
     struct wined3d_resource_desc wined3d_desc;
     unsigned int version = texture->version;
     HRESULT hr;
+    UINT row_pitch, slice_pitch;
+    struct wined3d_resource *resource = wined3d_surface_get_resource(wined3d_surface);
+
+    wined3d_resource_get_pitch(resource, &row_pitch, &slice_pitch);
 
     surface->IDirectDrawSurface7_iface.lpVtbl = &ddraw_surface7_vtbl;
     surface->IDirectDrawSurface4_iface.lpVtbl = &ddraw_surface4_vtbl;
@@ -6161,7 +6165,7 @@ HRESULT ddraw_surface_init(struct ddraw_surface *surface, struct ddraw *ddraw, s
     }
 
     *desc = texture->surface_desc;
-    wined3d_resource_get_desc(wined3d_surface_get_resource(wined3d_surface), &wined3d_desc);
+    wined3d_resource_get_desc(resource, &wined3d_desc);
     desc->dwWidth = wined3d_desc.width;
     desc->dwHeight = wined3d_desc.height;
     surface->first_attached = surface;
@@ -6171,7 +6175,7 @@ HRESULT ddraw_surface_init(struct ddraw_surface *surface, struct ddraw *ddraw, s
         if (desc->dwFlags & DDSD_LPSURFACE)
         {
             if ((desc->dwFlags & DDSD_LINEARSIZE)
-                    && desc->u1.dwLinearSize < wined3d_surface_get_pitch(wined3d_surface) * ((desc->dwHeight + 3) / 4))
+                    && desc->u1.dwLinearSize < row_pitch * ((desc->dwHeight + 3) / 4))
             {
                 WARN("Invalid linear size %u specified.\n", desc->u1.dwLinearSize);
                 return DDERR_INVALIDPARAMS;
@@ -6193,7 +6197,7 @@ HRESULT ddraw_surface_init(struct ddraw_surface *surface, struct ddraw *ddraw, s
         {
             desc->dwFlags |= DDSD_LINEARSIZE;
             desc->dwFlags &= ~DDSD_PITCH;
-            desc->u1.dwLinearSize = wined3d_surface_get_pitch(wined3d_surface) * ((desc->dwHeight + 3) / 4);
+            desc->u1.dwLinearSize = row_pitch * ((desc->dwHeight + 3) / 4);
         }
     }
     else
@@ -6221,7 +6225,7 @@ HRESULT ddraw_surface_init(struct ddraw_surface *surface, struct ddraw *ddraw, s
         {
             desc->dwFlags |= DDSD_PITCH;
             desc->dwFlags &= ~DDSD_LINEARSIZE;
-            desc->u1.lPitch = wined3d_surface_get_pitch(wined3d_surface);
+            desc->u1.lPitch = row_pitch;
         }
     }
 
