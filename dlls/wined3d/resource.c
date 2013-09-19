@@ -516,3 +516,35 @@ BOOL wined3d_resource_prepare_map_memory(struct wined3d_resource *resource, stru
             return FALSE;
     }
 }
+
+void CDECL wined3d_resource_get_pitch(const struct wined3d_resource *resource, UINT *row_pitch,
+        UINT *slice_pitch)
+{
+    const struct wined3d_format *format = resource->format;
+
+    if (resource->custom_row_pitch)
+    {
+        *row_pitch = resource->custom_row_pitch;
+        *slice_pitch = resource->custom_slice_pitch;
+        return;
+    }
+
+    if (format->flags & WINED3DFMT_FLAG_BLOCKS)
+    {
+        /* Since compressed formats are block based, pitch means the amount of
+         * bytes to the next row of block rather than the next row of pixels. */
+        UINT row_block_count = (resource->width + format->block_width - 1) / format->block_width;
+        UINT slice_block_count = (resource->height + format->block_height - 1) / format->block_height;
+        *row_pitch = row_block_count * format->block_byte_count;
+        *slice_pitch = *row_pitch * slice_block_count;
+    }
+    else
+    {
+        unsigned char alignment = resource->device->surface_alignment;
+        *row_pitch = format->byte_count * resource->width;  /* Bytes / row */
+        *row_pitch = (*row_pitch + alignment - 1) & ~(alignment - 1);
+        *slice_pitch = *row_pitch * resource->height;
+    }
+
+    TRACE("Returning row pitch %u, slice pitch %u.\n", *row_pitch, *slice_pitch);
+}

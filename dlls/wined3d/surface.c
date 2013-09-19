@@ -391,6 +391,7 @@ static HRESULT surface_create_dib_section(struct wined3d_surface *surface)
     BITMAPINFO *b_info;
     int extraline = 0;
     DWORD *masks;
+    UINT row_pitch, slice_pitch;
 
     TRACE("surface %p.\n", surface);
 
@@ -436,10 +437,11 @@ static HRESULT surface_create_dib_section(struct wined3d_surface *surface)
 
     b_info->bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
     /* TODO: Is there a nicer way to force a specific alignment? (8 byte for ddraw) */
-    b_info->bmiHeader.biWidth = wined3d_surface_get_pitch(surface) / format->byte_count;
+    wined3d_resource_get_pitch(&surface->resource, &row_pitch, &slice_pitch);
+    b_info->bmiHeader.biWidth = row_pitch / format->byte_count;
     b_info->bmiHeader.biHeight = 0 - surface->resource.height - extraline;
     b_info->bmiHeader.biSizeImage = (surface->resource.height + extraline)
-            * wined3d_surface_get_pitch(surface);
+            * row_pitch;
     b_info->bmiHeader.biPlanes = 1;
     b_info->bmiHeader.biBitCount = format->byte_count * 8;
 
@@ -1457,8 +1459,8 @@ static void surface_download_data(struct wined3d_surface *surface, const struct 
         void *mem;
         GLenum gl_format = format->glFormat;
         GLenum gl_type = format->glType;
-        int src_pitch = 0;
-        int dst_pitch = 0;
+        UINT src_pitch = 0;
+        UINT dst_row_pitch, dst_slice_pitch;
 
         /* In case of P8 the index is stored in the alpha component if the primary render target uses P8. */
         if (format->id == WINED3DFMT_P8_UINT && swapchain_is_p8(surface->resource.device->swapchains[0]))
@@ -1471,7 +1473,7 @@ static void surface_download_data(struct wined3d_surface *surface, const struct 
         {
             unsigned char alignment = surface->resource.device->surface_alignment;
             src_pitch = format->byte_count * surface->pow2Width;
-            dst_pitch = wined3d_surface_get_pitch(surface);
+            wined3d_resource_get_pitch(&surface->resource, &dst_row_pitch, &dst_slice_pitch);
             src_pitch = (src_pitch + alignment - 1) & ~(alignment - 1);
             mem = HeapAlloc(GetProcessHeap(), 0, src_pitch * surface->pow2Height);
         }
@@ -1558,12 +1560,12 @@ static void surface_download_data(struct wined3d_surface *surface, const struct 
              * and doesn't have to be re-read. */
             src_data = mem;
             dst_data = data.addr;
-            TRACE("(%p) : Repacking the surface data from pitch %d to pitch %d\n", surface, src_pitch, dst_pitch);
+            TRACE("(%p) : Repacking the surface data from pitch %d to pitch %d\n", surface, src_pitch, dst_row_pitch);
             for (y = 0; y < surface->resource.height; ++y)
             {
-                memcpy(dst_data, src_data, dst_pitch);
+                memcpy(dst_data, src_data, dst_row_pitch);
                 src_data += src_pitch;
-                dst_data += dst_pitch;
+                dst_data += dst_row_pitch;
             }
 
             HeapFree(GetProcessHeap(), 0, mem);
@@ -1846,7 +1848,7 @@ HRESULT surface_upload_from_surface(struct wined3d_surface *dst_surface, const P
     UINT update_w, update_h;
     UINT dst_w, dst_h;
     RECT r, dst_rect;
-    UINT src_pitch;
+    UINT src_row_pitch, src_slice_pitch;
     POINT p;
 
     TRACE("dst_surface %p, dst_point %s, src_surface %p, src_rect %s.\n",
@@ -1933,9 +1935,9 @@ HRESULT surface_upload_from_surface(struct wined3d_surface *dst_surface, const P
     wined3d_texture_bind(dst_surface->container, context, FALSE);
 
     wined3d_resource_get_memory(&src_surface->resource, src_surface->resource.locations, &data);
-    src_pitch = wined3d_surface_get_pitch(src_surface);
+    wined3d_resource_get_pitch(&src_surface->resource, &src_row_pitch, &src_slice_pitch);
 
-    surface_upload_data(dst_surface, gl_info, src_format, src_rect, src_pitch, dst_point, FALSE, &data);
+    surface_upload_data(dst_surface, gl_info, src_format, src_rect, src_row_pitch, dst_point, FALSE, &data);
 
     context_invalidate_active_texture(context);
 
@@ -2389,35 +2391,6 @@ struct wined3d_palette * CDECL wined3d_surface_get_palette(const struct wined3d_
     return surface->palette;
 }
 
-DWORD CDECL wined3d_surface_get_pitch(const struct wined3d_surface *surface)
-{
-    const struct wined3d_format *format = surface->resource.format;
-    DWORD pitch;
-
-    TRACE("surface %p.\n", surface);
-
-    if (surface->pitch)
-        return surface->pitch;
-
-    if (format->flags & WINED3DFMT_FLAG_BLOCKS)
-    {
-        /* Since compressed formats are block based, pitch means the amount of
-         * bytes to the next row of block rather than the next row of pixels. */
-        UINT row_block_count = (surface->resource.width + format->block_width - 1) / format->block_width;
-        pitch = row_block_count * format->block_byte_count;
-    }
-    else
-    {
-        unsigned char alignment = surface->resource.device->surface_alignment;
-        pitch = surface->resource.format->byte_count * surface->resource.width;  /* Bytes / row */
-        pitch = (pitch + alignment - 1) & ~(alignment - 1);
-    }
-
-    TRACE("Returning %u.\n", pitch);
-
-    return pitch;
-}
-
 HRESULT CDECL wined3d_surface_set_overlay_position(struct wined3d_surface *surface, LONG x, LONG y)
 {
     LONG w, h;
@@ -2617,12 +2590,13 @@ HRESULT CDECL wined3d_surface_update_desc(struct wined3d_surface *surface,
         surface->resource.map_binding = WINED3D_LOCATION_USER_MEMORY;
         valid_location = WINED3D_LOCATION_USER_MEMORY;
     }
-    surface->pitch = pitch;
+    surface->resource.custom_row_pitch = pitch;
+    surface->resource.custom_slice_pitch = pitch * surface->resource.height;
     surface->resource.format = format;
     surface->resource.multisample_type = multisample_type;
     surface->resource.multisample_quality = multisample_quality;
-    if (surface->pitch)
-        surface->resource.size = height * surface->pitch;
+    if (surface->resource.custom_row_pitch)
+        surface->resource.size = height * surface->resource.custom_row_pitch;
     else
         surface->resource.size = resource_size;
 
@@ -3073,7 +3047,7 @@ HRESULT CDECL wined3d_surface_map(struct wined3d_surface *surface,
     if (format->flags & WINED3DFMT_FLAG_BROKEN_PITCH)
         map_desc->row_pitch = surface->resource.width * format->byte_count;
     else
-        map_desc->row_pitch = wined3d_surface_get_pitch(surface);
+        wined3d_resource_get_pitch(&surface->resource, &map_desc->row_pitch, &map_desc->slice_pitch);
     map_desc->slice_pitch = 0;
 
     if (!rect)
@@ -3251,8 +3225,9 @@ static void read_from_framebuffer(struct wined3d_surface *surface,
     BOOL bpp;
     BOOL srcIsUpsideDown;
     struct wined3d_bo_address data;
-    UINT pitch = wined3d_surface_get_pitch(surface);
+    UINT pitch, slice_pitch;
 
+    wined3d_resource_get_pitch(&surface->resource, &pitch, &slice_pitch);
     wined3d_resource_get_memory(&surface->resource, dst_location, &data);
 
     /* Context_release does not restore the original context in case of
@@ -4902,7 +4877,7 @@ static HRESULT surface_load_texture(struct wined3d_surface *surface,
     RECT src_rect = {0, 0, surface->resource.width, surface->resource.height};
     struct wined3d_device *device = surface->resource.device;
     enum wined3d_conversion_type convert;
-    UINT width, src_pitch, dst_pitch;
+    UINT width, src_row_pitch, src_slice_pitch, dst_pitch;
     struct wined3d_bo_address data;
     struct wined3d_format format;
     POINT dst_point = {0, 0};
@@ -5004,7 +4979,7 @@ static HRESULT surface_load_texture(struct wined3d_surface *surface,
     else surface->flags &= ~SFLAG_GLCKEY;
 
     width = surface->resource.width;
-    src_pitch = wined3d_surface_get_pitch(surface);
+    wined3d_resource_get_pitch(&surface->resource, &src_row_pitch, &src_slice_pitch);
 
     /* Don't use PBOs for converted surfaces. During PBO conversion we look at
      * SFLAG_CONVERTED but it isn't set (yet) in all cases it is getting
@@ -5039,10 +5014,10 @@ static HRESULT surface_load_texture(struct wined3d_surface *surface,
             context_release(context);
             return E_OUTOFMEMORY;
         }
-        format.convert(data.addr, mem, src_pitch, src_pitch * height,
+        format.convert(data.addr, mem, src_row_pitch, src_row_pitch * height,
                 dst_pitch, dst_pitch * height, width, height, 1);
         format.byte_count = format.conv_byte_count;
-        src_pitch = dst_pitch;
+        src_row_pitch = dst_pitch;
         data.addr = mem;
     }
     else if (convert != WINED3D_CT_NONE)
@@ -5060,14 +5035,14 @@ static HRESULT surface_load_texture(struct wined3d_surface *surface,
             context_release(context);
             return E_OUTOFMEMORY;
         }
-        d3dfmt_convert_surface(data.addr, mem, src_pitch,
+        d3dfmt_convert_surface(data.addr, mem, src_row_pitch,
                 width, height, dst_pitch, convert, surface);
         format.byte_count = format.conv_byte_count;
-        src_pitch = dst_pitch;
+        src_row_pitch = dst_pitch;
         data.addr = mem;
     }
 
-    surface_upload_data(surface, gl_info, &format, &src_rect, src_pitch, &dst_point, srgb, &data);
+    surface_upload_data(surface, gl_info, &format, &src_rect, src_row_pitch, &dst_point, srgb, &data);
 
     HeapFree(GetProcessHeap(), 0, mem);
 
