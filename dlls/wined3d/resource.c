@@ -918,7 +918,7 @@ HRESULT wined3d_resource_map2(struct wined3d_resource *resource,
     }
 
     if (!(flags & (WINED3D_MAP_NO_DIRTY_UPDATE | WINED3D_MAP_READONLY)))
-        wined3d_resource_invalidate_location(resource, ~resource->map_binding);
+        resource->unmap_dirtify = TRUE;
 
     resource->map_count++;
 
@@ -938,6 +938,11 @@ void wined3d_resource_unmap_internal(struct wined3d_resource *resource)
     wined3d_resource_release_map_ptr(resource, context);
     if (context)
         context_release(context);
+
+    if (resource->unmap_dirtify)
+        wined3d_resource_invalidate_location(resource, ~resource->map_binding);
+    resource->unmap_dirtify = FALSE;
+
 }
 
 HRESULT wined3d_resource_unmap2(struct wined3d_resource *resource)
