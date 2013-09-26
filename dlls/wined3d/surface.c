@@ -2262,6 +2262,14 @@ void CDECL wined3d_surface_set_palette(struct wined3d_surface *surface, struct w
         return;
     }
 
+    if (wined3d_settings.cs_multithreaded)
+    {
+        struct wined3d_device *device = surface->resource.device;
+        FIXME("Waiting for cs.\n");
+        wined3d_cs_emit_glfinish(device->cs);
+        device->cs->ops->finish(device->cs);
+    }
+
     surface->palette = palette;
     if (palette)
         surface->surface_ops->surface_realize_palette(surface);
@@ -2914,6 +2922,20 @@ HRESULT CDECL wined3d_surface_getdc(struct wined3d_surface *surface, HDC *dc)
     struct wined3d_context *context = NULL;
 
     TRACE("surface %p, dc %p.\n", surface, dc);
+
+    if (!(surface->resource.format->flags & WINED3DFMT_FLAG_GETDC))
+    {
+        WARN("Cannot use GetDC on a %s surface.\n", debug_d3dformat(surface->resource.format->id));
+        return WINED3DERR_INVALIDCALL;
+    }
+
+    if (wined3d_settings.cs_multithreaded)
+    {
+        struct wined3d_device *device = surface->resource.device;
+        FIXME("Waiting for cs.\n");
+        wined3d_cs_emit_glfinish(device->cs);
+        device->cs->ops->finish(device->cs);
+    }
 
     /* Give more detailed info for ddraw. */
     if (surface->flags & SFLAG_DCINUSE)
