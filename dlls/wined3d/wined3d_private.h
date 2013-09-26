@@ -2107,7 +2107,9 @@ BOOL wined3d_resource_check_block_align(const struct wined3d_resource *resource,
 void wined3d_resource_free_bo(struct wined3d_resource *resource) DECLSPEC_HIDDEN;
 HRESULT wined3d_resource_map(struct wined3d_resource *resource, struct wined3d_map_desc *map_desc,
         const struct wined3d_box *box, DWORD flags) DECLSPEC_HIDDEN;
+void *wined3d_resource_map_internal(struct wined3d_resource *resource, DWORD flags) DECLSPEC_HIDDEN;
 HRESULT wined3d_resource_unmap(struct wined3d_resource *resource) DECLSPEC_HIDDEN;
+void wined3d_resource_unmap_internal(struct wined3d_resource *resource) DECLSPEC_HIDDEN;
 
 /* Tests show that the start address of resources is 32 byte aligned */
 #define RESOURCE_ALIGNMENT 16
@@ -2597,6 +2599,9 @@ void wined3d_cs_emit_blt(struct wined3d_cs *cs, struct wined3d_surface *dst_surf
         enum wined3d_texture_filter_type filter) DECLSPEC_HIDDEN;
 void wined3d_cs_emit_color_fill(struct wined3d_cs *cs, struct wined3d_surface *surface,
         const RECT *rect, const struct wined3d_color *color) DECLSPEC_HIDDEN;
+void *wined3d_cs_emit_resource_map(struct wined3d_cs *cs, struct wined3d_resource *resource,
+        DWORD flags) DECLSPEC_HIDDEN;
+void wined3d_cs_emit_resource_unmap(struct wined3d_cs *cs, struct wined3d_resource *resource) DECLSPEC_HIDDEN;
 
 /* Direct3D terminology with little modifications. We do not have an issued state
  * because only the driver knows about it, but we have a created state because d3d
