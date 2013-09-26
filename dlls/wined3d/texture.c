@@ -1464,6 +1464,13 @@ HRESULT CDECL wined3d_texture_get_dc(struct wined3d_texture *texture, unsigned i
 
     surface = surface_from_resource(sub_resource);
 
+    if (wined3d_settings.cs_multithreaded)
+    {
+        FIXME("Waiting for cs.\n");
+        wined3d_cs_emit_glfinish(device->cs);
+        device->cs->ops->finish(device->cs);
+    }
+
     /* Give more detailed info for ddraw. */
     if (surface->flags & SFLAG_DCINUSE)
         return WINEDDERR_DCALREADYCREATED;
