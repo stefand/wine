@@ -1739,6 +1739,8 @@ static UINT wined3d_cs_exec_color_fill(struct wined3d_cs *cs, const void *data)
 
     surface_color_fill(op->surface, &op->rect, &op->color);
 
+    wined3d_cs_surface_dec_fence(op->surface);
+
     return sizeof(*op);
 }
 
@@ -1752,6 +1754,8 @@ void wined3d_cs_emit_color_fill(struct wined3d_cs *cs, struct wined3d_surface *s
     op->surface = surface;
     op->rect = *rect;
     op->color = *color;
+
+    wined3d_cs_surface_inc_fence(surface);
 
     cs->ops->submit(cs, sizeof(*op));
 }
