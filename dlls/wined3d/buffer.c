@@ -500,6 +500,7 @@ BYTE *buffer_get_sysmem(struct wined3d_buffer *This, struct wined3d_context *con
 
     if (!wined3d_resource_allocate_sysmem(&This->resource))
         ERR("Failed to allocate system memory.\n");
+    This->resource.heap_memory = This->resource.map_heap_memory;
     This->map_mem = This->resource.heap_memory;
 
     if (This->buffer_type_hint == GL_ELEMENT_ARRAY_BUFFER_ARB)

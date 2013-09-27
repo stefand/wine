@@ -2072,7 +2072,7 @@ struct wined3d_resource
     UINT depth;
     UINT size;
     DWORD priority;
-    void *heap_memory, *user_memory, *bitmap_data;
+    void *heap_memory, *map_heap_memory, *user_memory, *bitmap_data;
     struct wined3d_gl_bo *buffer, *map_buffer;
     UINT custom_row_pitch, custom_slice_pitch;
     struct list resource_list_entry;
@@ -2126,7 +2126,7 @@ void *wined3d_resource_map_internal(struct wined3d_resource *resource, DWORD fla
 HRESULT wined3d_resource_unmap(struct wined3d_resource *resource) DECLSPEC_HIDDEN;
 void wined3d_resource_unmap_internal(struct wined3d_resource *resource) DECLSPEC_HIDDEN;
 void wined3d_resource_changed(struct wined3d_resource *resource,
-        struct wined3d_gl_bo *swap_buffer) DECLSPEC_HIDDEN;
+        struct wined3d_gl_bo *swap_buffer, void *swap_heap_memory) DECLSPEC_HIDDEN;
 
 static inline void wined3d_resource_inc_fence(struct wined3d_resource *resource)
 {
@@ -2645,7 +2645,7 @@ void *wined3d_cs_emit_resource_map(struct wined3d_cs *cs, struct wined3d_resourc
         DWORD flags) DECLSPEC_HIDDEN;
 void wined3d_cs_emit_resource_unmap(struct wined3d_cs *cs, struct wined3d_resource *resource) DECLSPEC_HIDDEN;
 void wined3d_cs_emit_resource_changed(struct wined3d_cs *cs, struct wined3d_resource *resource,
-        struct wined3d_gl_bo *swap_buffer) DECLSPEC_HIDDEN;
+        struct wined3d_gl_bo *swap_buffer, void *swap_heap_memory) DECLSPEC_HIDDEN;
 void wined3d_cs_emit_swap_mem(struct wined3d_cs *cs, struct wined3d_buffer *buffer,
         BYTE *mem) DECLSPEC_HIDDEN;
 void wined3d_cs_emit_buffer_invalidate_bo_range(struct wined3d_cs *cs,
