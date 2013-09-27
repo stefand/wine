@@ -65,6 +65,7 @@ enum wined3d_cs_op
     WINED3D_CS_OP_COLOR_FILL,
     WINED3D_CS_OP_RESOURCE_MAP,
     WINED3D_CS_OP_RESOURCE_UNMAP,
+    WINED3D_CS_OP_RESOURCE_CHANGED,
     WINED3D_CS_OP_SWAP_MEM,
     WINED3D_CS_OP_BUFFER_INVALIDATE_RANGE,
     WINED3D_CS_OP_QUERY_ISSUE,
@@ -348,6 +349,12 @@ struct wined3d_cs_resource_map
 };
 
 struct wined3d_cs_resource_unmap
+{
+    enum wined3d_cs_op opcode;
+    struct wined3d_resource *resource;
+};
+
+struct wined3d_cs_resource_changed
 {
     enum wined3d_cs_op opcode;
     struct wined3d_resource *resource;
@@ -1842,6 +1849,27 @@ void wined3d_cs_emit_resource_unmap(struct wined3d_cs *cs, struct wined3d_resour
     cs->ops->submit_prio(cs, sizeof(*op));
 }
 
+static UINT wined3d_cs_exec_resource_changed(struct wined3d_cs *cs, const void *data)
+{
+    const struct wined3d_cs_resource_changed *op = data;
+    struct wined3d_resource *resource = op->resource;
+
+    wined3d_resource_changed(resource);
+
+    return sizeof(*op);
+}
+
+void wined3d_cs_emit_resource_changed(struct wined3d_cs *cs, struct wined3d_resource *resource)
+{
+    struct wined3d_cs_resource_changed *op;
+
+    op = cs->ops->require_space(cs, sizeof(*op));
+    op->opcode = WINED3D_CS_OP_RESOURCE_CHANGED;
+    op->resource = resource;
+
+    cs->ops->submit(cs, sizeof(*op));
+}
+
 static UINT wined3d_cs_exec_swap_mem(struct wined3d_cs *cs, const void *data)
 {
     const struct wined3d_cs_swap_mem *op = data;
@@ -2236,6 +2264,7 @@ static UINT (* const wined3d_cs_op_handlers[])(struct wined3d_cs *cs, const void
     /* WINED3D_CS_OP_COLOR_FILL             */ wined3d_cs_exec_color_fill,
     /* WINED3D_CS_OP_RESOURCE_MAP           */ wined3d_cs_exec_resource_map,
     /* WINED3D_CS_OP_RESOURCE_UNMAP         */ wined3d_cs_exec_resource_unmap,
+    /* WINED3D_CS_OP_RESOURCE_CHANGED       */ wined3d_cs_exec_resource_changed,
     /* WINED3D_CS_OP_SWAP_MEM               */ wined3d_cs_exec_swap_mem,
     /* WINED3D_CS_OP_BUFFER_INVALIDATE_RANGE*/ wined3d_cs_exec_buffer_invalidate_bo_range,
     /* WINED3D_CS_OP_QUERY_ISSUE            */ wined3d_cs_exec_query_issue,

@@ -2095,6 +2095,7 @@ HRESULT wined3d_resource_map(struct wined3d_resource *resource, struct wined3d_m
 void *wined3d_resource_map_internal(struct wined3d_resource *resource, DWORD flags) DECLSPEC_HIDDEN;
 HRESULT wined3d_resource_unmap(struct wined3d_resource *resource) DECLSPEC_HIDDEN;
 void wined3d_resource_unmap_internal(struct wined3d_resource *resource) DECLSPEC_HIDDEN;
+void wined3d_resource_changed(struct wined3d_resource *resource) DECLSPEC_HIDDEN;
 
 static inline void wined3d_resource_inc_fence(struct wined3d_resource *resource)
 {
@@ -2612,6 +2613,7 @@ void wined3d_cs_emit_color_fill(struct wined3d_cs *cs, struct wined3d_surface *s
 void *wined3d_cs_emit_resource_map(struct wined3d_cs *cs, struct wined3d_resource *resource,
         DWORD flags) DECLSPEC_HIDDEN;
 void wined3d_cs_emit_resource_unmap(struct wined3d_cs *cs, struct wined3d_resource *resource) DECLSPEC_HIDDEN;
+void wined3d_cs_emit_resource_changed(struct wined3d_cs *cs, struct wined3d_resource *resource) DECLSPEC_HIDDEN;
 void wined3d_cs_emit_swap_mem(struct wined3d_cs *cs, struct wined3d_buffer *buffer,
         BYTE *mem) DECLSPEC_HIDDEN;
 void wined3d_cs_emit_buffer_invalidate_bo_range(struct wined3d_cs *cs,

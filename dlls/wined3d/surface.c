@@ -1186,6 +1186,9 @@ static void wined3d_surface_location_invalidated(struct wined3d_resource *resour
 
     if (location & (WINED3D_LOCATION_TEXTURE_RGB | WINED3D_LOCATION_TEXTURE_SRGB))
         wined3d_texture_set_dirty(surface->container);
+
+    if (surface->swapchain && surface == surface->swapchain->front_buffer)
+        surface->surface_ops->surface_frontbuffer_updated(surface);
 }
 
 static const struct wined3d_surface_ops surface_ops =
@@ -2859,16 +2862,10 @@ HRESULT CDECL wined3d_surface_unmap(struct wined3d_surface *surface)
     HRESULT hr;
     TRACE("surface %p.\n", surface);
 
-    if (surface->resource.unmap_dirtify && surface->container)
-        wined3d_texture_set_dirty(surface->container);
-
-
     hr = wined3d_resource_unmap(&surface->resource);
     if (FAILED(hr))
         return hr;
 
-    if (surface->swapchain && surface == surface->swapchain->front_buffer)
-        surface->surface_ops->surface_frontbuffer_updated(surface);
     memset(&surface->lockedRect, 0, sizeof(surface->lockedRect));
 
     return hr;
