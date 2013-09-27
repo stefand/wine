@@ -849,8 +849,7 @@ static void wined3d_resource_sync(struct wined3d_resource *resource)
         default:
             break;
     }
-    if (!real_res->access_fence)
-        FIXME("Waiting for CS even though resource %p is idle.\n", resource);
+    wined3d_resource_wait_fence(real_res);
 }
 
 HRESULT wined3d_resource_map2(struct wined3d_resource *resource,
@@ -871,6 +870,11 @@ HRESULT wined3d_resource_map2(struct wined3d_resource *resource,
     }
 
     flags = wined3d_resource_sanitize_map_flags(resource, flags);
+
+    if (flags & (WINED3D_MAP_NOOVERWRITE | WINED3D_MAP_DISCARD))
+    {
+        FIXME("Dynamic resource map is inefficient\n");
+    }
 
     wined3d_resource_sync(resource);
 
