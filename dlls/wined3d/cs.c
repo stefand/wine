@@ -498,6 +498,22 @@ static void wined3d_cs_emit_fence_prio(struct wined3d_cs *cs, BOOL *signalled)
     cs->ops->submit_prio(cs, sizeof(*op));
 }
 
+static void wined3d_cs_surface_dec_fence(struct wined3d_surface *surface)
+{
+    if (surface->container)
+        wined3d_resource_dec_fence(&surface->container->resource);
+    else
+        wined3d_resource_dec_fence(&surface->resource);
+}
+
+static void wined3d_cs_surface_inc_fence(struct wined3d_surface *surface)
+{
+    if (surface->container)
+        wined3d_resource_inc_fence(&surface->container->resource);
+    else
+        wined3d_resource_inc_fence(&surface->resource);
+}
+
 static UINT wined3d_cs_exec_present(struct wined3d_cs *cs, const void *data)
 {
     const struct wined3d_cs_present *op = data;
@@ -591,6 +607,30 @@ void wined3d_cs_emit_clear(struct wined3d_cs *cs, DWORD rect_count, const RECT *
     cs->ops->submit(cs, size);
 }
 
+static inline BOOL wined3d_cs_colorwrite_enabled(const struct wined3d_state *state, unsigned int i)
+{
+    switch (i)
+    {
+        case 0:
+            return !!state->render_states[WINED3D_RS_COLORWRITEENABLE];
+        case 1:
+            return !!state->render_states[WINED3D_RS_COLORWRITEENABLE1];
+        case 2:
+            return !!state->render_states[WINED3D_RS_COLORWRITEENABLE2];
+        case 3:
+            return !!state->render_states[WINED3D_RS_COLORWRITEENABLE3];
+        default:
+            ERR("Unexpected color target %u.\n", i);
+            return TRUE;
+    }
+}
+
+static inline BOOL wined3d_cs_depth_stencil_enabled(const struct wined3d_state *state)
+{
+    return state->render_states[WINED3D_RS_ZENABLE]
+            || state->render_states[WINED3D_RS_STENCILENABLE];
+}
+
 static UINT wined3d_cs_exec_draw(struct wined3d_cs *cs, const void *data)
 {
     const struct wined3d_cs_draw *op = data;
@@ -626,6 +666,13 @@ static UINT wined3d_cs_exec_draw(struct wined3d_cs *cs, const void *data)
         if (cs->state.textures[i])
             wined3d_resource_dec_fence(&cs->state.textures[i]->resource);
     }
+    for (i = 0; i < sizeof(cs->state.fb.render_targets) / sizeof(*cs->state.fb.render_targets); i++)
+    {
+        if (cs->state.fb.render_targets[i] && wined3d_cs_colorwrite_enabled(&cs->state, i))
+            wined3d_cs_surface_dec_fence(cs->state.fb.render_targets[i]);
+    }
+    if (cs->state.fb.depth_stencil && wined3d_cs_depth_stencil_enabled(&cs->state))
+        wined3d_cs_surface_dec_fence(cs->state.fb.depth_stencil);
 
     return sizeof(*op);
 }
@@ -665,6 +712,13 @@ void wined3d_cs_emit_draw(struct wined3d_cs *cs, UINT start_idx, UINT index_coun
         if (state->textures[i])
             wined3d_resource_inc_fence(&state->textures[i]->resource);
     }
+    for (i = 0; i < sizeof(state->fb.render_targets) / sizeof(*state->fb.render_targets); i++)
+    {
+        if (state->fb.render_targets[i] && wined3d_cs_colorwrite_enabled(state, i))
+            wined3d_cs_surface_inc_fence(state->fb.render_targets[i]);
+    }
+    if (state->fb.depth_stencil && wined3d_cs_depth_stencil_enabled(state))
+        wined3d_cs_surface_inc_fence(state->fb.depth_stencil);
 
     cs->ops->submit(cs, sizeof(*op));
 }
