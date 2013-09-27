@@ -210,6 +210,7 @@ HRESULT resource_init(struct wined3d_resource *resource, struct wined3d_device *
             ERR("Failed to allocate system memory.\n");
             return E_OUTOFMEMORY;
         }
+        resource->heap_memory = resource->map_heap_memory;
     }
     else
     {
@@ -246,6 +247,7 @@ void resource_cleanup(struct wined3d_resource *resource)
     }
 
     wined3d_resource_free_sysmem(resource);
+    resource->map_heap_memory = NULL;
 
     device_resource_released(resource->device, resource);
 }
@@ -330,7 +332,7 @@ BOOL wined3d_resource_allocate_sysmem(struct wined3d_resource *resource)
     p = (void **)(((ULONG_PTR)mem + align) & ~(RESOURCE_ALIGNMENT - 1)) - 1;
     *p = mem;
 
-    resource->heap_memory = ++p;
+    resource->map_heap_memory = ++p;
 
     return TRUE;
 }
