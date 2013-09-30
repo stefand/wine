@@ -767,8 +767,10 @@ static void surface_realize_palette(struct wined3d_surface *surface)
     if (!palette) return;
 
     context = context_acquire(surface->resource.device, NULL);
-    if (surface->resource.format->id == WINED3DFMT_P8_UINT
+
+    if ((surface->resource.format->id == WINED3DFMT_P8_UINT
             || surface->resource.format->id == WINED3DFMT_P8_UINT_A8_UNORM)
+            && !(surface->resource.locations & WINED3D_LOCATION_DISCARDED))
     {
         if (surface->resource.usage & WINED3DUSAGE_RENDERTARGET)
         {
