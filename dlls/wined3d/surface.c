@@ -1703,7 +1703,7 @@ static HRESULT d3dfmt_get_conv(const struct wined3d_surface *surface, BOOL need_
     return WINED3D_OK;
 }
 
-static BOOL surface_check_block_align(struct wined3d_surface *surface, const RECT *rect)
+BOOL surface_check_block_align(struct wined3d_surface *surface, const RECT *rect)
 {
     struct wined3d_box box;
 
