@@ -309,6 +309,7 @@ struct wined3d_settings
     unsigned int max_sm_gs;
     unsigned int max_sm_ps;
     BOOL no_3d;
+    BOOL cs_multithreaded;
 };
 
 extern struct wined3d_settings wined3d_settings DECLSPEC_HIDDEN;
@@ -2894,6 +2895,18 @@ enum wined3d_push_constants
     WINED3D_PUSH_CONSTANTS_PS_B,
 };
 
+struct wined3d_cs_list
+{
+    struct list blocks;
+};
+
+struct wined3d_cs_block
+{
+    struct list entry;
+    UINT pos;
+    BYTE data[4000]; /* FIXME? The size is somewhat arbitrary. */
+};
+
 struct wined3d_cs_ops
 {
     void *(*require_space)(struct wined3d_cs *cs, size_t size);
@@ -2907,9 +2920,14 @@ struct wined3d_cs
     const struct wined3d_cs_ops *ops;
     struct wined3d_device *device;
     struct wined3d_state state;
+    HANDLE thread;
+    DWORD tls_idx;
 
     size_t data_size;
     void *data;
+
+    struct wined3d_cs_list free_list;
+    struct wined3d_cs_list exec_list;
 };
 
 struct wined3d_cs *wined3d_cs_create(struct wined3d_device *device) DECLSPEC_HIDDEN;
