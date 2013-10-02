@@ -3077,6 +3077,7 @@ void wined3d_cs_emit_shader_cleanup(struct wined3d_cs *cs, struct wined3d_shader
 void wined3d_cs_emit_create_vbo(struct wined3d_cs *cs, struct wined3d_buffer *buffer) DECLSPEC_HIDDEN;
 void wined3d_cs_emit_resource_cleanup(struct wined3d_cs *cs,
         struct wined3d_resource *resource) DECLSPEC_HIDDEN;
+void wined3d_cs_emit_buffer_cleanup(struct wined3d_cs *cs, struct wined3d_buffer *buffer) DECLSPEC_HIDDEN;
 
 static inline void wined3d_cs_push_constants(struct wined3d_cs *cs, enum wined3d_push_constants p,
         unsigned int start_idx, unsigned int count, const void *constants)
@@ -3177,6 +3178,7 @@ void buffer_invalidate_bo_range(struct wined3d_buffer *buffer, unsigned int offs
 void buffer_swap_mem(struct wined3d_buffer *buffer, BYTE *mem) DECLSPEC_HIDDEN;
 void buffer_create_buffer_object(struct wined3d_buffer *This,
         struct wined3d_context *context) DECLSPEC_HIDDEN;
+void wined3d_buffer_cleanup_cs(struct wined3d_buffer *buffer) DECLSPEC_HIDDEN;
 
 struct wined3d_rendertarget_view
 {
