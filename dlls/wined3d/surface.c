@@ -2157,7 +2157,12 @@ ULONG CDECL wined3d_surface_decref(struct wined3d_surface *surface)
 
     if (!refcount)
     {
+        struct wined3d_device *device = surface->resource.device;
+
         surface_cleanup(surface);
+        if (wined3d_settings.cs_multithreaded)
+            device->cs->ops->finish(device->cs);
+
         surface->resource.parent_ops->wined3d_object_destroyed(surface->resource.parent);
 
         TRACE("Destroyed surface %p.\n", surface);
@@ -6148,6 +6153,8 @@ static HRESULT surface_init(struct wined3d_surface *surface, struct wined3d_text
         ERR("Private setup failed, returning %#x\n", hr);
         surface_set_container(surface, NULL);
         surface_cleanup(surface);
+        if (wined3d_settings.cs_multithreaded)
+            surface->resource.device->cs->ops->finish(surface->resource.device->cs);
         return hr;
     }
 

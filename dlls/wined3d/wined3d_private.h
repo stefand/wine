@@ -2110,6 +2110,7 @@ HRESULT wined3d_resource_unmap(struct wined3d_resource *resource) DECLSPEC_HIDDE
 void wined3d_resource_unmap_internal(struct wined3d_resource *resource) DECLSPEC_HIDDEN;
 void wined3d_resource_changed(struct wined3d_resource *resource,
         struct wined3d_gl_bo *swap_buffer, void *swap_heap_memory) DECLSPEC_HIDDEN;
+void wined3d_resource_cleanup_cs(struct wined3d_resource *resource) DECLSPEC_HIDDEN;
 
 static inline void wined3d_resource_inc_fence(struct wined3d_resource *resource)
 {
@@ -2651,6 +2652,8 @@ void wined3d_cs_emit_update_texture(struct wined3d_cs *cs, struct wined3d_textur
         struct wined3d_texture *dst) DECLSPEC_HIDDEN;
 void wined3d_cs_emit_evict_resource(struct wined3d_cs *cs, struct wined3d_resource *resource) DECLSPEC_HIDDEN;
 void wined3d_cs_emit_create_vbo(struct wined3d_cs *cs, struct wined3d_buffer *buffer) DECLSPEC_HIDDEN;
+void wined3d_cs_emit_resource_cleanup(struct wined3d_cs *cs,
+        struct wined3d_resource *resource) DECLSPEC_HIDDEN;
 
 /* Direct3D terminology with little modifications. We do not have an issued state
  * because only the driver knows about it, but we have a created state because d3d
