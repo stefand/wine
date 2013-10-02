@@ -311,10 +311,8 @@ void wined3d_volume_destroy(struct wined3d_volume *volume)
     TRACE("volume %p.\n", volume);
 
     resource_cleanup(&volume->resource);
-    if (wined3d_settings.cs_multithreaded)
-        device->cs->ops->finish(device->cs);
     volume->resource.parent_ops->wined3d_object_destroyed(volume->resource.parent);
-    HeapFree(GetProcessHeap(), 0, volume);
+    wined3d_cs_emit_volume_cleanup(device->cs, volume);
 }
 
 static void volume_unload(struct wined3d_resource *resource)
@@ -345,6 +343,11 @@ static void volume_unload(struct wined3d_resource *resource)
     /* The texture name is managed by the container. */
 
     resource_unload(resource);
+}
+
+void wined3d_volume_cleanup_cs(struct wined3d_volume *volume)
+{
+    HeapFree(GetProcessHeap(), 0, volume);
 }
 
 static BOOL wined3d_volume_check_box_dimensions(const struct wined3d_volume *volume,
