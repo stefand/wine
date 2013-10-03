@@ -5,7 +5,7 @@
  * Copyright 2002-2003 Raphael Junqueira
  * Copyright 2002-2003, 2004 Jason Edmeades
  * Copyright 2005 Oliver Stieber
- * Copyright 2006-2011, 2013 Stefan Dösinger for CodeWeavers
+ * Copyright 2006-2011, 2013-2014 Stefan Dösinger for CodeWeavers
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -2067,6 +2067,7 @@ struct wined3d_resource
     DWORD priority;
     void *heap_memory;
     struct list resource_list_entry;
+    DWORD locations;
 
     void *parent;
     const struct wined3d_parent_ops *parent_ops;
@@ -2221,7 +2222,7 @@ struct wined3d_volume
     struct wined3d_resource resource;
     struct wined3d_texture *container;
 
-    DWORD flags, locations;
+    DWORD flags;
     GLint texture_level;
     DWORD download_count;
     GLuint pbo;
