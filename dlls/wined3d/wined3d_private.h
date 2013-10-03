@@ -2051,6 +2051,8 @@ DWORD wined3d_resource_sanitize_map_flags(const struct wined3d_resource *resourc
         DWORD flags) DECLSPEC_HIDDEN;
 GLbitfield wined3d_resource_gl_map_flags(DWORD d3d_flags) DECLSPEC_HIDDEN;
 GLenum wined3d_resource_gl_legacy_map_flags(DWORD d3d_flags) DECLSPEC_HIDDEN;
+void wined3d_resource_validate_location(struct wined3d_resource *resource,
+        DWORD location) DECLSPEC_HIDDEN;
 
 /* Tests show that the start address of resources is 32 byte aligned */
 #define RESOURCE_ALIGNMENT 16

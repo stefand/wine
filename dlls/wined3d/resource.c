@@ -281,3 +281,10 @@ GLenum wined3d_resource_gl_legacy_map_flags(DWORD d3d_flags)
         return GL_WRITE_ONLY_ARB;
     return GL_READ_WRITE_ARB;
 }
+
+void wined3d_resource_validate_location(struct wined3d_resource *resource, DWORD location)
+{
+    TRACE("Resource %p, setting %s.\n", resource, wined3d_debug_location(location));
+    resource->locations |= location;
+    TRACE("new location flags are %s.\n", wined3d_debug_location(resource->locations));
+}
