@@ -2015,6 +2015,8 @@ struct wined3d_resource_ops
 {
     void (*resource_unload)(struct wined3d_resource *resource);
     void (*resource_location_invalidated)(struct wined3d_resource *resource, DWORD location);
+    void (*resource_load_location)(struct wined3d_resource *resource,
+            struct wined3d_context *context, DWORD location);
 };
 
 struct wined3d_resource
@@ -2063,6 +2065,9 @@ void wined3d_resource_validate_location(struct wined3d_resource *resource,
         DWORD location) DECLSPEC_HIDDEN;
 void wined3d_resource_invalidate_location(struct wined3d_resource *resource,
         DWORD location) DECLSPEC_HIDDEN;
+void wined3d_resource_load_location(struct wined3d_resource *resource,
+        struct wined3d_context *context, DWORD location) DECLSPEC_HIDDEN;
+DWORD wined3d_resource_access_from_location(DWORD location) DECLSPEC_HIDDEN;
 
 /* Tests show that the start address of resources is 32 byte aligned */
 #define RESOURCE_ALIGNMENT 16
