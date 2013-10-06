@@ -36,20 +36,9 @@ WINE_DECLARE_DEBUG_CHANNEL(d3d);
 
 #define MAXLOCKCOUNT 50 /* After this amount of locks do not free the sysmem copy. */
 
-static void surface_cleanup(struct wined3d_surface *surface)
+void wined3d_surface_cleanup_cs(struct wined3d_surface *surface)
 {
-    struct wined3d_surface *overlay, *cur;
-
-    TRACE("surface %p.\n", surface);
-
-    if (wined3d_settings.cs_multithreaded)
-    {
-        FIXME("Waiting for cs.\n");
-        surface->resource.device->cs->ops->finish(surface->resource.device->cs);
-    }
-
-    if (surface->resource.buffer || surface->rb_multisample
-            || surface->rb_resolved || !list_empty(&surface->renderbuffers))
+    if (surface->rb_multisample || surface->rb_resolved || !list_empty(&surface->renderbuffers))
     {
         struct wined3d_renderbuffer_entry *entry, *entry2;
         const struct wined3d_gl_info *gl_info;
@@ -87,6 +76,16 @@ static void surface_cleanup(struct wined3d_surface *surface)
         surface->resource.bitmap_data = NULL;
     }
 
+    TRACE("Destroyed surface %p.\n", surface);
+    HeapFree(GetProcessHeap(), 0, surface);
+}
+
+static void surface_cleanup(struct wined3d_surface *surface)
+{
+    struct wined3d_surface *overlay, *cur;
+
+    TRACE("surface %p.\n", surface);
+
     if (surface->overlay_dest)
         list_remove(&surface->overlay_entry);
 
@@ -97,6 +96,7 @@ static void surface_cleanup(struct wined3d_surface *surface)
     }
 
     resource_cleanup(&surface->resource);
+    wined3d_cs_emit_surface_cleanup(surface->resource.device->cs, surface);
 }
 
 void surface_update_draw_binding(struct wined3d_surface *surface)
@@ -2157,16 +2157,8 @@ ULONG CDECL wined3d_surface_decref(struct wined3d_surface *surface)
 
     if (!refcount)
     {
-        struct wined3d_device *device = surface->resource.device;
-
-        surface_cleanup(surface);
-        if (wined3d_settings.cs_multithreaded)
-            device->cs->ops->finish(device->cs);
-
         surface->resource.parent_ops->wined3d_object_destroyed(surface->resource.parent);
-
-        TRACE("Destroyed surface %p.\n", surface);
-        HeapFree(GetProcessHeap(), 0, surface);
+        surface_cleanup(surface);
     }
 
     return refcount;
@@ -6153,8 +6145,6 @@ static HRESULT surface_init(struct wined3d_surface *surface, struct wined3d_text
         ERR("Private setup failed, returning %#x\n", hr);
         surface_set_container(surface, NULL);
         surface_cleanup(surface);
-        if (wined3d_settings.cs_multithreaded)
-            surface->resource.device->cs->ops->finish(surface->resource.device->cs);
         return hr;
     }
 
@@ -6196,7 +6186,7 @@ HRESULT CDECL wined3d_surface_create(struct wined3d_texture *container,
     if (FAILED(hr = surface_init(object, container, desc, flags)))
     {
         WARN("Failed to initialize surface, returning %#x.\n", hr);
-        HeapFree(GetProcessHeap(), 0, object);
+        /* The command stream takes care of freeing the memory. */
         return hr;
     }
 
