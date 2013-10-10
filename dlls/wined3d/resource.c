@@ -961,7 +961,7 @@ HRESULT wined3d_resource_map2(struct wined3d_resource *resource,
         }
     }
 
-    if (!(flags & (WINED3D_MAP_NO_DIRTY_UPDATE | WINED3D_MAP_READONLY)))
+    if (!(flags & WINED3D_MAP_READONLY))
         resource->unmap_dirtify = TRUE;
 
     resource->map_count++;
