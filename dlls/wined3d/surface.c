@@ -2435,7 +2435,10 @@ HRESULT CDECL wined3d_surface_update_desc(struct wined3d_surface *surface,
     }
 
     if (device->d3d_initialized)
-        surface->resource.resource_ops->resource_unload(&surface->resource);
+    {
+        wined3d_cs_emit_evict_resource(device->cs, &surface->resource);
+        device->cs->ops->finish(device->cs);
+    }
 
     if (surface->flags & SFLAG_DIBSECTION)
     {
