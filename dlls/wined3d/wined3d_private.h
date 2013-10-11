@@ -2412,6 +2412,8 @@ struct wined3d_gl_bo *wined3d_device_get_bo(struct wined3d_device *device, UINT 
 void wined3d_device_release_bo(struct wined3d_device *device, struct wined3d_gl_bo *bo,
         const struct wined3d_context *context) DECLSPEC_HIDDEN;
 void device_create_dummy_textures(struct wined3d_device *device, struct wined3d_context *context) DECLSPEC_HIDDEN;
+void device_delete_opengl_contexts_cs(struct wined3d_device *device,
+        struct wined3d_swapchain *swapchain) DECLSPEC_HIDDEN;
 
 static inline BOOL isStateDirty(const struct wined3d_context *context, DWORD state)
 {
@@ -3100,6 +3102,8 @@ void wined3d_cs_emit_release_dc(struct wined3d_cs *cs, struct wined3d_texture *t
         unsigned int sub_resource_idx) DECLSPEC_HIDDEN;
 void wined3d_cs_emit_create_dummy_textures(struct wined3d_cs *cs) DECLSPEC_HIDDEN;
 HRESULT wined3d_cs_emit_create_swapchain_context(struct wined3d_cs *cs,
+        struct wined3d_swapchain *swapchain) DECLSPEC_HIDDEN;
+void wined3d_cs_emit_delete_opengl_contexts(struct wined3d_cs *cs,
         struct wined3d_swapchain *swapchain) DECLSPEC_HIDDEN;
 
 static inline void wined3d_cs_push_constants(struct wined3d_cs *cs, enum wined3d_push_constants p,
