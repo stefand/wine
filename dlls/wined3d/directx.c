@@ -302,11 +302,16 @@ static void wined3d_caps_gl_ctx_create_attribs(struct wined3d_caps_gl_ctx *caps_
         return;
     }
 
+    wglMakeCurrent(NULL, NULL);
+
     if (!wglMakeCurrent(caps_gl_ctx->dc, new_ctx))
     {
         ERR("Failed to make new context current, last error %#x.\n", GetLastError());
         if (!wglDeleteContext(new_ctx))
             ERR("Failed to delete new context, last error %#x.\n", GetLastError());
+
+        wglMakeCurrent(caps_gl_ctx->dc, caps_gl_ctx->gl_ctx);
+
         gl_info->p_wglCreateContextAttribsARB = NULL;
         return;
     }
