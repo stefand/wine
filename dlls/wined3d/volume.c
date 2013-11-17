@@ -597,10 +597,7 @@ HRESULT wined3d_volume_map(struct wined3d_volume *volume,
     }
 
     if (!(flags & (WINED3D_MAP_NO_DIRTY_UPDATE | WINED3D_MAP_READONLY)))
-    {
-        wined3d_texture_set_dirty(volume->container);
         wined3d_resource_invalidate_location(&volume->resource, ~volume->resource.map_binding);
-    }
 
     volume->resource.map_count++;
 
@@ -668,11 +665,20 @@ static HRESULT volume_resource_sub_resource_unmap(struct wined3d_resource *resou
     return WINED3DERR_INVALIDCALL;
 }
 
+static void wined3d_volume_location_invalidated(struct wined3d_resource *resource, DWORD location)
+{
+    struct wined3d_volume *volume = volume_from_resource(resource);
+
+    if (location & (WINED3D_LOCATION_TEXTURE_RGB | WINED3D_LOCATION_TEXTURE_SRGB))
+        wined3d_texture_set_dirty(volume->container);
+}
+
 static const struct wined3d_resource_ops volume_resource_ops =
 {
     volume_resource_incref,
     volume_resource_decref,
     volume_unload,
+    wined3d_volume_location_invalidated,
     volume_resource_sub_resource_map,
     volume_resource_sub_resource_unmap,
 };
