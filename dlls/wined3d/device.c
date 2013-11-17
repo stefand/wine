@@ -296,6 +296,15 @@ void device_clear_render_targets(struct wined3d_device *device, UINT rt_count, c
     unsigned int i;
     RECT ds_rect;
 
+    context = context_acquire(device, target);
+    if (!context->valid)
+    {
+        context_release(context);
+        WARN("Invalid context, skipping clear.\n");
+        return;
+    }
+    gl_info = context->gl_info;
+
     /* When we're clearing parts of the drawable, make sure that the target surface is well up to date in the
      * drawable. After the clear we'll mark the drawable up to date, so we have to make sure that this is true
      * for the cleared parts, and the untouched parts.
@@ -310,18 +319,9 @@ void device_clear_render_targets(struct wined3d_device *device, UINT rt_count, c
         {
             struct wined3d_surface *rt = fb->render_targets[i];
             if (rt)
-                surface_load_location(rt, rt->draw_binding);
+                surface_load_location(rt, context, rt->draw_binding);
         }
     }
-
-    context = context_acquire(device, target);
-    if (!context->valid)
-    {
-        context_release(context);
-        WARN("Invalid context, skipping clear.\n");
-        return;
-    }
-    gl_info = context->gl_info;
 
     if (target)
     {
