@@ -743,8 +743,6 @@ HRESULT CDECL wined3d_volume_map(struct wined3d_volume *volume,
 
     if (!(flags & (WINED3D_MAP_NO_DIRTY_UPDATE | WINED3D_MAP_READONLY)))
     {
-        wined3d_texture_set_dirty(volume->container);
-
         if (volume->flags & WINED3D_VFLAG_PBO)
             wined3d_resource_invalidate_location(&volume->resource, ~WINED3D_LOCATION_BUFFER);
         else
@@ -793,9 +791,18 @@ HRESULT CDECL wined3d_volume_unmap(struct wined3d_volume *volume)
     return WINED3D_OK;
 }
 
+static void wined3d_volume_location_invalidated(struct wined3d_resource *resource, DWORD location)
+{
+    struct wined3d_volume *volume = volume_from_resource(resource);
+
+    if (location & (WINED3D_LOCATION_TEXTURE_RGB | WINED3D_LOCATION_TEXTURE_SRGB))
+        wined3d_texture_set_dirty(volume->container);
+}
+
 static const struct wined3d_resource_ops volume_resource_ops =
 {
     volume_unload,
+    wined3d_volume_location_invalidated,
 };
 
 static HRESULT volume_init(struct wined3d_volume *volume, struct wined3d_texture *container,
