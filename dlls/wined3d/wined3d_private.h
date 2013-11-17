@@ -1989,6 +1989,7 @@ static inline void context_invalidate_active_texture(struct wined3d_context *con
 struct wined3d_resource_ops
 {
     void (*resource_unload)(struct wined3d_resource *resource);
+    void (*resource_location_invalidated)(struct wined3d_resource *resource, DWORD location);
 };
 
 struct wined3d_resource

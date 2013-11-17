@@ -1333,9 +1333,15 @@ static void surface_unload(struct wined3d_resource *resource)
     resource_unload(resource);
 }
 
+static void wined3d_surface_location_invalidated(struct wined3d_resource *resource, DWORD location)
+{
+    ERR("Not yet implemented.\n");
+}
+
 static const struct wined3d_resource_ops surface_resource_ops =
 {
     surface_unload,
+    wined3d_surface_location_invalidated,
 };
 
 static const struct wined3d_surface_ops surface_ops =
