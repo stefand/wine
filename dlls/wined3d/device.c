@@ -319,7 +319,7 @@ void device_clear_render_targets(struct wined3d_device *device, UINT rt_count, c
         {
             struct wined3d_surface *rt = fb->render_targets[i];
             if (rt)
-                surface_load_location(rt, context, rt->draw_binding);
+                wined3d_resource_load_location(&rt->resource, context, rt->draw_binding);
         }
     }
 

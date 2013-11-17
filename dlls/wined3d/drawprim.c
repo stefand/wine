@@ -625,7 +625,7 @@ void draw_primitive(struct wined3d_device *device, UINT start_idx, UINT index_co
             struct wined3d_surface *target = device->fb.render_targets[i];
             if (target)
             {
-                surface_load_location(target, context, target->draw_binding);
+                wined3d_resource_load_location(&target->resource, context, target->draw_binding);
                 wined3d_resource_invalidate_location(&target->resource, ~target->draw_binding);
             }
         }
