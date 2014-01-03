@@ -2301,7 +2301,6 @@ void surface_translate_drawable_coords(const struct wined3d_surface *surface, HW
 void surface_update_draw_binding(struct wined3d_surface *surface) DECLSPEC_HIDDEN;
 HRESULT surface_upload_from_surface(struct wined3d_surface *dst_surface, const POINT *dst_point,
         struct wined3d_surface *src_surface, const RECT *src_rect) DECLSPEC_HIDDEN;
-void surface_validate_location(struct wined3d_surface *surface, DWORD location) DECLSPEC_HIDDEN;
 HRESULT wined3d_surface_create(struct wined3d_texture *container, const struct wined3d_resource_desc *desc,
         GLenum target, GLint level, DWORD flags, struct wined3d_surface **surface) DECLSPEC_HIDDEN;
 void surface_prepare_map_memory(struct wined3d_surface *surface) DECLSPEC_HIDDEN;
