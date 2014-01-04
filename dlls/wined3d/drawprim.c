@@ -617,7 +617,7 @@ void draw_primitive(struct wined3d_device *device, UINT start_idx, UINT index_co
             if (target)
             {
                 surface_load_location(target, target->draw_binding);
-                surface_invalidate_location(target, ~target->draw_binding);
+                wined3d_resource_invalidate_location(&target->resource, ~target->draw_binding);
             }
         }
     }
