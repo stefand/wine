@@ -389,7 +389,7 @@ void device_clear_render_targets(struct wined3d_device *device, UINT rt_count, c
             if (rt)
             {
                 wined3d_resource_validate_location(&rt->resource, rt->draw_binding);
-                surface_invalidate_location(rt, ~rt->draw_binding);
+                wined3d_resource_invalidate_location(&rt->resource, ~rt->draw_binding);
             }
         }
 
