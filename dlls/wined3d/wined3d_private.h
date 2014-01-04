@@ -2286,7 +2286,6 @@ HRESULT surface_color_fill(struct wined3d_surface *s,
 GLenum surface_get_gl_buffer(const struct wined3d_surface *surface) DECLSPEC_HIDDEN;
 void surface_get_drawable_size(const struct wined3d_surface *surface, const struct wined3d_context *context,
         unsigned int *width, unsigned int *height) DECLSPEC_HIDDEN;
-void surface_invalidate_location(struct wined3d_surface *surface, DWORD location) DECLSPEC_HIDDEN;
 BOOL surface_is_offscreen(const struct wined3d_surface *surface) DECLSPEC_HIDDEN;
 void surface_load(struct wined3d_surface *surface, BOOL srgb) DECLSPEC_HIDDEN;
 void surface_load_ds_location(struct wined3d_surface *surface,
