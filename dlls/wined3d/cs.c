@@ -87,6 +87,8 @@ enum wined3d_cs_op
     WINED3D_CS_OP_CREATE_DUMMY_TEXTURES,
     WINED3D_CS_OP_CREATE_SWAPCHAIN_CONTEXT,
     WINED3D_CS_OP_DELETE_GL_CONTEXTS,
+    WINED3D_CS_OP_SET_PALETTE,
+    WINED3D_CS_OP_PALETTE_SET_ENTRIES,
     WINED3D_CS_OP_STOP,
 };
 
@@ -507,6 +509,21 @@ struct wined3d_cs_delete_gl_contexts
 {
     enum wined3d_cs_op opcode;
     struct wined3d_swapchain *swapchain;
+};
+
+struct wined3d_cs_set_palette
+{
+    enum wined3d_cs_op opcode;
+    struct wined3d_surface *surface;
+    struct wined3d_palette *palette;
+};
+
+struct wined3d_cs_palette_set_entries
+{
+    enum wined3d_cs_op opcode;
+    struct wined3d_palette *palette;
+    DWORD flags, start, count;
+    BYTE data[4];
 };
 
 static void wined3d_cs_mt_submit(struct wined3d_cs *cs, size_t size)
@@ -2499,6 +2516,74 @@ void wined3d_cs_emit_delete_opengl_contexts(struct wined3d_cs *cs, struct wined3
     cs->ops->finish(cs);
 }
 
+static UINT wined3d_cs_exec_set_palette(struct wined3d_cs *cs, const void *data)
+{
+    const struct wined3d_cs_set_palette *op = data;
+
+    op->surface->palette = op->palette;
+    if (op->palette)
+        op->surface->surface_ops->surface_realize_palette(op->surface);
+
+    return sizeof(*op);
+}
+
+void wined3d_cs_emit_set_palette(struct wined3d_cs *cs, struct wined3d_surface *surface,
+        struct wined3d_palette *palette)
+{
+    struct wined3d_cs_set_palette *op;
+
+    op = cs->ops->require_space(cs, sizeof(*op));
+    op->opcode = WINED3D_CS_OP_SET_PALETTE;
+    op->surface = surface;
+    op->palette = palette;
+
+    cs->ops->submit(cs, sizeof(*op));
+    /* Make this a synchronous op for now. The main consideration is that a palette
+     * change shows up immediately on the front buffer. We might want to treat this
+     * like a swap and increment and wait for the swap counter. */
+    FIXME("Waiting for cs.\n");
+    cs->ops->finish(cs);
+}
+
+static UINT wined3d_cs_exec_palette_set_entries(struct wined3d_cs *cs, const void *data)
+{
+    const struct wined3d_cs_palette_set_entries *op = data;
+    UINT extra_size;
+
+    extra_size = op->flags & WINED3D_PALETTE_8BIT_ENTRIES ? op->count : op->count * 4;
+    extra_size = extra_size < 4 ? 0 : extra_size - 4;
+
+    wined3d_exec_palette_set_entries(op->palette, op->flags, op->start,
+            op->count, (const PALETTEENTRY *)op->data);
+
+    return sizeof(*op) + extra_size;
+}
+
+void wined3d_cs_emit_palette_set_entries(struct wined3d_cs *cs, struct wined3d_palette *palette,
+        DWORD flags, DWORD start, DWORD count, const PALETTEENTRY *entries)
+{
+    struct wined3d_cs_palette_set_entries *op;
+    UINT extra_size, copy_size;
+
+    copy_size = flags & WINED3D_PALETTE_8BIT_ENTRIES ? count : count * 4;
+    extra_size = copy_size < 4 ? 0 : copy_size - 4;
+
+    op = cs->ops->require_space(cs, sizeof(*op) + extra_size);
+    op->opcode = WINED3D_CS_OP_PALETTE_SET_ENTRIES;
+    op->palette = palette;
+    op->flags = flags;
+    op->start = start;
+    op->count = count;
+    memcpy(op->data, entries, copy_size);
+
+    cs->ops->submit(cs, sizeof(*op) + extra_size);
+    /* Make this a synchronous op for now. The main consideration is that a palette
+     * change shows up immediately on the front buffer. We might want to treat this
+     * like a swap and increment and wait for the swap counter. */
+    FIXME("Waiting for cs.\n");
+    cs->ops->finish(cs);
+}
+
 static UINT (* const wined3d_cs_op_handlers[])(struct wined3d_cs *cs, const void *data) =
 {
     /* WINED3D_CS_OP_NOP                    */ wined3d_cs_exec_nop,
@@ -2564,6 +2649,8 @@ static UINT (* const wined3d_cs_op_handlers[])(struct wined3d_cs *cs, const void
     /* WINED3D_CS_OP_CREATE_DUMMY_TEXTURES  */ wined3d_cs_exec_create_dummy_textures,
     /* WINED3D_CS_OP_CREATE_SWAPCHAIN_CON...*/ wined3d_cs_exec_create_swapchain_context,
     /* WINED3D_CS_OP_DELETE_GL_CONTEXTS     */ wined3d_cs_exec_delete_gl_contexts,
+    /* WINED3D_CS_OP_SET_PALETTE            */ wined3d_cs_exec_set_palette,
+    /* WINED3D_CS_OP_PALETTE_SET_ENTRIES    */ wined3d_cs_exec_palette_set_entries,
 };
 
 static inline void *_wined3d_cs_mt_require_space(struct wined3d_cs *cs, size_t size, BOOL prio)

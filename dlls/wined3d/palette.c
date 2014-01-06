@@ -78,14 +78,10 @@ HRESULT CDECL wined3d_palette_get_entries(const struct wined3d_palette *palette,
     return WINED3D_OK;
 }
 
-HRESULT CDECL wined3d_palette_set_entries(struct wined3d_palette *palette,
+void wined3d_exec_palette_set_entries(struct wined3d_palette *palette,
         DWORD flags, DWORD start, DWORD count, const PALETTEENTRY *entries)
 {
     struct wined3d_resource *resource;
-
-    TRACE("palette %p, flags %#x, start %u, count %u, entries %p.\n",
-            palette, flags, start, count, entries);
-    TRACE("Palette flags: %#x.\n", palette->flags);
 
     if (palette->flags & WINED3D_PALETTE_8BIT_ENTRIES)
     {
@@ -126,7 +122,18 @@ HRESULT CDECL wined3d_palette_set_entries(struct wined3d_palette *palette,
                 surface->surface_ops->surface_realize_palette(surface);
         }
     }
+}
 
+HRESULT CDECL wined3d_palette_set_entries(struct wined3d_palette *palette,
+        DWORD flags, DWORD start, DWORD count, const PALETTEENTRY *entries)
+{
+    struct wined3d_device *device = palette->device;
+
+    TRACE("palette %p, flags %#x, start %u, count %u, entries %p.\n",
+            palette, flags, start, count, entries);
+    TRACE("Palette flags: %#x.\n", palette->flags);
+
+    wined3d_cs_emit_palette_set_entries(device->cs, palette, flags, start, count, entries);
     return WINED3D_OK;
 }
 

@@ -2672,6 +2672,10 @@ HRESULT wined3d_cs_emit_create_swapchain_context(struct wined3d_cs *cs,
         struct wined3d_swapchain *swapchain) DECLSPEC_HIDDEN;
 void wined3d_cs_emit_delete_opengl_contexts(struct wined3d_cs *cs,
         struct wined3d_swapchain *swapchain) DECLSPEC_HIDDEN;
+void wined3d_cs_emit_set_palette(struct wined3d_cs *cs, struct wined3d_surface *surface,
+        struct wined3d_palette *palette) DECLSPEC_HIDDEN;
+void wined3d_cs_emit_palette_set_entries(struct wined3d_cs *cs, struct wined3d_palette *palette,
+        DWORD flags, DWORD start, DWORD count, const PALETTEENTRY *entries) DECLSPEC_HIDDEN;
 
 /* Direct3D terminology with little modifications. We do not have an issued state
  * because only the driver knows about it, but we have a created state because d3d
@@ -3135,6 +3139,9 @@ struct wined3d_palette
     PALETTEENTRY               palents[256];   /*|               */
     DWORD flags;
 };
+
+void wined3d_exec_palette_set_entries(struct wined3d_palette *palette, DWORD flags,
+        DWORD start, DWORD count, const PALETTEENTRY *entries) DECLSPEC_HIDDEN;
 
 /* DirectDraw utility functions */
 extern enum wined3d_format_id pixelformat_for_depth(DWORD depth) DECLSPEC_HIDDEN;

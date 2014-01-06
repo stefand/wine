@@ -2250,6 +2250,8 @@ HRESULT CDECL wined3d_surface_restore(struct wined3d_surface *surface)
 
 void CDECL wined3d_surface_set_palette(struct wined3d_surface *surface, struct wined3d_palette *palette)
 {
+    struct wined3d_device *device = surface->resource.device;
+
     TRACE("surface %p, palette %p.\n", surface, palette);
 
     if (surface->palette == palette)
@@ -2258,17 +2260,7 @@ void CDECL wined3d_surface_set_palette(struct wined3d_surface *surface, struct w
         return;
     }
 
-    if (wined3d_settings.cs_multithreaded)
-    {
-        struct wined3d_device *device = surface->resource.device;
-        FIXME("Waiting for cs.\n");
-        wined3d_cs_emit_glfinish(device->cs);
-        device->cs->ops->finish(device->cs);
-    }
-
-    surface->palette = palette;
-    if (palette)
-        surface->surface_ops->surface_realize_palette(surface);
+    wined3d_cs_emit_set_palette(device->cs, surface, palette);
 }
 
 struct wined3d_palette * CDECL wined3d_surface_get_palette(const struct wined3d_surface *surface)
