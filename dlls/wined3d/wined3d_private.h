@@ -2036,7 +2036,7 @@ struct wined3d_resource
     UINT depth;
     UINT size;
     DWORD priority;
-    void *heap_memory;
+    void *heap_memory, *user_memory, *bitmap_data;
     struct list resource_list_entry;
     DWORD locations;
 
@@ -2196,7 +2196,6 @@ void wined3d_volume_upload_data(struct wined3d_volume *volume, const struct wine
 struct wined3d_surface_dib
 {
     HBITMAP DIBsection;
-    void *bitmap_data;
     UINT bitmap_size;
 };
 
@@ -2232,7 +2231,6 @@ struct wined3d_surface
     struct wined3d_texture *container;
     struct wined3d_swapchain *swapchain;
     DWORD map_binding;
-    void *user_memory;
 
     DWORD flags;
 
