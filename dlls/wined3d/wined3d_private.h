@@ -2231,7 +2231,6 @@ struct wined3d_surface
     struct wined3d_swapchain *swapchain;
     DWORD map_binding;
     void *user_memory;
-    DWORD locations;
 
     DWORD flags;
 
