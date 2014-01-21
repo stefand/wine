@@ -2226,7 +2226,6 @@ struct wined3d_surface
     struct wined3d_palette *palette; /* D3D7 style palette handling */
     DWORD draw_binding, map_binding;
     void *user_memory;
-    DWORD locations;
 
     DWORD flags;
 
