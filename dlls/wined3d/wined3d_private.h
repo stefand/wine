@@ -2244,8 +2244,6 @@ struct wined3d_surface
     /* A method to retrieve the drawable size. Not in the Vtable to make it changeable */
     void (*get_drawable_size)(const struct wined3d_context *context, UINT *width, UINT *height);
 
-    /* PBO */
-    GLuint                    pbo;
     GLuint rb_multisample;
     GLuint rb_resolved;
     GLint texture_level;
