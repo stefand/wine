@@ -2316,7 +2316,6 @@ HRESULT surface_upload_from_surface(struct wined3d_surface *dst_surface, const P
         struct wined3d_surface *src_surface, const RECT *src_rect) DECLSPEC_HIDDEN;
 HRESULT wined3d_surface_create(struct wined3d_texture *container, const struct wined3d_resource_desc *desc,
         GLenum target, GLint level, DWORD flags, struct wined3d_surface **surface) DECLSPEC_HIDDEN;
-void surface_prepare_map_memory(struct wined3d_surface *surface) DECLSPEC_HIDDEN;
 
 void draw_textured_quad(const struct wined3d_surface *src_surface, struct wined3d_context *context,
         const RECT *src_rect, const RECT *dst_rect, enum wined3d_texture_filter_type filter) DECLSPEC_HIDDEN;
