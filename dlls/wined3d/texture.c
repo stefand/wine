@@ -1465,13 +1465,44 @@ HRESULT CDECL wined3d_texture_create(struct wined3d_device *device, const struct
     return WINED3D_OK;
 }
 
-HRESULT CDECL wined3d_texture_get_dc(struct wined3d_texture *texture, unsigned int sub_resource_idx, HDC *dc)
+void wined3d_texture_get_dc_cs(struct wined3d_texture *texture, unsigned int sub_resource_idx)
 {
     struct wined3d_device *device = texture->resource.device;
     struct wined3d_context *context = NULL;
+    struct wined3d_resource *sub_resource = wined3d_texture_get_sub_resource(texture, sub_resource_idx);
+    struct wined3d_surface *surface = surface_from_resource(sub_resource);
+
+    if (device->d3d_initialized)
+        context = context_acquire(device, NULL);
+
+    /* Create a DIB section if there isn't a dc yet. */
+    if (!surface->hDC)
+    {
+        HRESULT hr = surface_create_dib_section(surface);
+        if (FAILED(hr))
+        {
+            if (context)
+                context_release(context);
+            return;
+        }
+        if (!(surface->resource.map_binding == WINED3D_LOCATION_USER_MEMORY
+                || surface->container->flags & WINED3D_TEXTURE_PIN_SYSMEM
+                || surface->resource.buffer))
+            surface->resource.map_binding = WINED3D_LOCATION_DIB;
+    }
+
+    wined3d_resource_load_location(&surface->resource, context, WINED3D_LOCATION_DIB);
+    wined3d_resource_invalidate_location(&surface->resource, ~WINED3D_LOCATION_DIB);
+
+    if (context)
+        context_release(context);
+}
+
+HRESULT CDECL wined3d_texture_get_dc(struct wined3d_texture *texture, unsigned int sub_resource_idx, HDC *dc)
+{
+    struct wined3d_device *device = texture->resource.device;
     struct wined3d_resource *sub_resource;
     struct wined3d_surface *surface;
-    HRESULT hr;
 
     TRACE("texture %p, sub_resource_idx %u, dc %p.\n", texture, sub_resource_idx, dc);
 
@@ -1486,13 +1517,6 @@ HRESULT CDECL wined3d_texture_get_dc(struct wined3d_texture *texture, unsigned i
 
     surface = surface_from_resource(sub_resource);
 
-    if (wined3d_settings.cs_multithreaded)
-    {
-        FIXME("Waiting for cs.\n");
-        wined3d_cs_emit_glfinish(device->cs);
-        device->cs->ops->finish(device->cs);
-    }
-
     /* Give more detailed info for ddraw. */
     if (surface->flags & SFLAG_DCINUSE)
         return WINEDDERR_DCALREADYCREATED;
@@ -1501,43 +1525,45 @@ HRESULT CDECL wined3d_texture_get_dc(struct wined3d_texture *texture, unsigned i
     if (surface->resource.map_count)
         return WINED3DERR_INVALIDCALL;
 
-    if (device->d3d_initialized)
-        context = context_acquire(device, NULL);
-
-    /* Create a DIB section if there isn't a dc yet. */
-    if (!surface->hDC)
-    {
-        if (FAILED(hr = surface_create_dib_section(surface)))
-        {
-            if (context)
-                context_release(context);
-             return WINED3DERR_INVALIDCALL;
-        }
-        if (!(surface->resource.map_binding == WINED3D_LOCATION_USER_MEMORY
-                || surface->container->flags & WINED3D_TEXTURE_PIN_SYSMEM
-                || surface->resource.buffer))
-            surface->resource.map_binding = WINED3D_LOCATION_DIB;
-    }
-
-    wined3d_resource_load_location(&surface->resource, context, WINED3D_LOCATION_DIB);
-    wined3d_resource_invalidate_location(&surface->resource, ~WINED3D_LOCATION_DIB);
-
-    if (context)
-        context_release(context);
-
     surface->flags |= SFLAG_DCINUSE;
     surface->resource.map_count++;
-
+    wined3d_cs_emit_get_dc(device->cs, texture, sub_resource_idx);
     *dc = surface->hDC;
     TRACE("Returning dc %p.\n", *dc);
 
-    return WINED3D_OK;
+    return *dc ? WINED3D_OK : WINED3DERR_INVALIDCALL;
+}
+
+void wined3d_texture_release_dc_cs(struct wined3d_texture *texture, unsigned int sub_resource_idx)
+{
+    struct wined3d_resource *sub_resource = wined3d_texture_get_sub_resource(texture, sub_resource_idx);
+    struct wined3d_surface *surface = surface_from_resource(sub_resource);
+
+    if (surface->resource.map_binding == WINED3D_LOCATION_USER_MEMORY || (surface->container->flags & WINED3D_TEXTURE_PIN_SYSMEM
+            && surface->resource.map_binding != WINED3D_LOCATION_DIB))
+    {
+        /* The game Salammbo modifies the surface contents without mapping the surface between
+         * a GetDC/ReleaseDC operation and flipping the surface. If the DIB remains the active
+         * copy and is copied to the screen, this update, which draws the mouse pointer, is lost.
+         * Do not only copy the DIB to the map location, but also make sure the map location is
+         * copied back to the DIB in the next getdc call.
+         *
+         * The same consideration applies to user memory surfaces. */
+        struct wined3d_device *device = surface->resource.device;
+        struct wined3d_context *context = NULL;
+
+        if (device->d3d_initialized)
+            context = context_acquire(device, NULL);
+
+        wined3d_resource_load_location(&surface->resource, context, surface->resource.map_binding);
+        wined3d_resource_invalidate_location(&surface->resource, WINED3D_LOCATION_DIB);
+        if (context)
+            context_release(context);
+    }
 }
 
 HRESULT CDECL wined3d_texture_release_dc(struct wined3d_texture *texture, unsigned int sub_resource_idx, HDC dc)
 {
-    struct wined3d_device *device = texture->resource.device;
-    struct wined3d_context *context = NULL;
     struct wined3d_resource *sub_resource;
     struct wined3d_surface *surface;
 
@@ -1567,26 +1593,7 @@ HRESULT CDECL wined3d_texture_release_dc(struct wined3d_texture *texture, unsign
     surface->resource.map_count--;
     surface->flags &= ~SFLAG_DCINUSE;
 
-    if (surface->resource.map_binding == WINED3D_LOCATION_USER_MEMORY
-            || (surface->container->flags & WINED3D_TEXTURE_PIN_SYSMEM
-            && surface->resource.map_binding != WINED3D_LOCATION_DIB))
-    {
-        /* The game Salammbo modifies the surface contents without mapping the surface between
-         * a GetDC/ReleaseDC operation and flipping the surface. If the DIB remains the active
-         * copy and is copied to the screen, this update, which draws the mouse pointer, is lost.
-         * Do not only copy the DIB to the map location, but also make sure the map location is
-         * copied back to the DIB in the next getdc call.
-         *
-         * The same consideration applies to user memory surfaces. */
-
-        if (device->d3d_initialized)
-            context = context_acquire(device, NULL);
-
-        wined3d_resource_load_location(&surface->resource, context, surface->resource.map_binding);
-        wined3d_resource_invalidate_location(&surface->resource, WINED3D_LOCATION_DIB);
-        if (context)
-            context_release(context);
-    }
+    wined3d_cs_emit_release_dc(surface->resource.device->cs, texture, sub_resource_idx);
 
     return WINED3D_OK;
 }
