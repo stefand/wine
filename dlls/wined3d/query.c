@@ -358,9 +358,7 @@ static HRESULT wined3d_occlusion_query_ops_get_data(struct wined3d_query *query,
     }
 
     if (data)
-    {
-        fill_query_data(data, size, &samples, sizeof(samples));
-    }
+        fill_query_data(data, size, &oq->samples, sizeof(oq->samples));
 
     return S_OK;
 }
