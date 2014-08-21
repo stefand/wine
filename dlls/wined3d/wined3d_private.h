@@ -3067,6 +3067,7 @@ void wined3d_cs_emit_buffer_swap_mem(struct wined3d_cs *cs, struct wined3d_buffe
 void wined3d_cs_emit_buffer_invalidate_bo_range(struct wined3d_cs *cs,
         struct wined3d_buffer *buffer, unsigned int offset, unsigned int size) DECLSPEC_HIDDEN;
 void wined3d_cs_emit_buffer_preload(struct wined3d_cs *cs, struct wined3d_buffer *buffer) DECLSPEC_HIDDEN;
+void wined3d_cs_emit_view_destroy(struct wined3d_cs *cs, struct wined3d_rendertarget_view *view) DECLSPEC_HIDDEN;
 
 static inline void wined3d_cs_push_constants(struct wined3d_cs *cs, enum wined3d_push_constants p,
         unsigned int start_idx, unsigned int count, const void *constants)
@@ -3196,6 +3197,8 @@ static inline struct wined3d_surface *wined3d_rendertarget_view_get_surface(
 
     return texture->sub_resources[view->sub_resource_idx].u.surface;
 }
+
+void wined3d_rendertarget_view_destroy(struct wined3d_rendertarget_view *view) DECLSPEC_HIDDEN;
 
 struct wined3d_shader_resource_view
 {
