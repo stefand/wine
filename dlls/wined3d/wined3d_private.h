@@ -2829,6 +2829,8 @@ struct wined3d_sampler
     GLuint name;
 };
 
+void wined3d_sampler_destroy(struct wined3d_sampler *sampler) DECLSPEC_HIDDEN;
+
 struct wined3d_vertex_declaration_element
 {
     const struct wined3d_format *format;
@@ -3085,6 +3087,7 @@ void wined3d_cs_emit_resource_cleanup(struct wined3d_cs *cs,
         struct wined3d_resource *resource) DECLSPEC_HIDDEN;
 void wined3d_cs_emit_buffer_cleanup(struct wined3d_cs *cs, struct wined3d_buffer *buffer) DECLSPEC_HIDDEN;
 void wined3d_cs_emit_texture_cleanup(struct wined3d_cs *cs, struct wined3d_texture *texture) DECLSPEC_HIDDEN;
+void wined3d_cs_emit_sampler_destroy(struct wined3d_cs *cs, struct wined3d_sampler *sampler) DECLSPEC_HIDDEN;
 
 static inline void wined3d_cs_push_constants(struct wined3d_cs *cs, enum wined3d_push_constants p,
         unsigned int start_idx, unsigned int count, const void *constants)
