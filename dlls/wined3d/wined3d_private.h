@@ -3040,6 +3040,9 @@ void wined3d_cs_emit_texture_preload(struct wined3d_cs *cs, struct wined3d_textu
 void wined3d_cs_emit_update_texture(struct wined3d_cs *cs, struct wined3d_texture *src,
         struct wined3d_texture *dst) DECLSPEC_HIDDEN;
 void wined3d_cs_emit_evict_resource(struct wined3d_cs *cs, struct wined3d_resource *resource) DECLSPEC_HIDDEN;
+void wined3d_cs_emit_update_sub_resource(struct wined3d_cs *cs, struct wined3d_resource *resource,
+        unsigned int sub_resource_idx, const struct wined3d_box *box, const void *data, unsigned int row_pitch,
+        unsigned int depth_pitch) DECLSPEC_HIDDEN;
 
 static inline void wined3d_cs_push_constants(struct wined3d_cs *cs, enum wined3d_push_constants p,
         unsigned int start_idx, unsigned int count, const void *constants)
