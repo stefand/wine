@@ -1317,6 +1317,9 @@ static HRESULT buffer_init(struct wined3d_buffer *buffer, struct wined3d_device 
         buffer->flags |= WINED3D_BUFFER_CREATEBO;
     }
 
+    if (wined3d_settings.cs_multithreaded)
+        buffer->flags |= WINED3D_BUFFER_DOUBLEBUFFER;
+
     buffer->maps = HeapAlloc(GetProcessHeap(), 0, sizeof(*buffer->maps));
     if (!buffer->maps)
     {
@@ -1338,9 +1341,6 @@ static HRESULT buffer_init(struct wined3d_buffer *buffer, struct wined3d_device 
             return hr;
         }
     }
-
-    if (wined3d_settings.cs_multithreaded)
-        buffer->flags |= WINED3D_BUFFER_DOUBLEBUFFER;
 
     return WINED3D_OK;
 }
