@@ -1448,7 +1448,6 @@ HRESULT CDECL wined3d_texture_create(struct wined3d_device *device, const struct
     if (data && FAILED(hr = wined3d_texture_upload_data(object, data)))
     {
         wined3d_texture_cleanup(object);
-        HeapFree(GetProcessHeap(), 0, object);
         return hr;
     }
 
