@@ -94,6 +94,7 @@ enum wined3d_cs_op
     WINED3D_CS_OP_RELEASE_DC,
     WINED3D_CS_OP_SAMPLER_DESTROY,
     WINED3D_CS_OP_UPDATE_SUB_RESOURCE,
+    WINED3D_CS_OP_SRV_DESTROY,
     WINED3D_CS_OP_STOP,
 };
 
@@ -560,6 +561,12 @@ struct wined3d_cs_update_sub_resource
     unsigned int sub_resource_idx, row_pitch, depth_pitch;
     const struct wined3d_box *box;
     const void *data;
+};
+
+struct wined3d_cs_shader_resource_view_destroy
+{
+    enum wined3d_cs_op opcode;
+    struct wined3d_shader_resource_view *view;
 };
 
 static void wined3d_cs_mt_submit(struct wined3d_cs *cs, size_t size)
@@ -2840,6 +2847,26 @@ void wined3d_cs_emit_update_sub_resource(struct wined3d_cs *cs, struct wined3d_r
     cs->ops->finish(cs);
 }
 
+static UINT wined3d_cs_exec_shader_resource_view_destroy(struct wined3d_cs *cs, const void *data)
+{
+    const struct wined3d_cs_shader_resource_view_destroy *op = data;
+
+    wined3d_shader_resource_view_destroy_cs(op->view);
+
+    return sizeof(*op);
+}
+
+void wined3d_cs_emit_shader_resource_view_destroy(struct wined3d_cs *cs, struct wined3d_shader_resource_view *view)
+{
+    struct wined3d_cs_shader_resource_view_destroy *op;
+
+    op = cs->ops->require_space(cs, sizeof(*op));
+    op->opcode = WINED3D_CS_OP_SRV_DESTROY;
+    op->view = view;
+
+    cs->ops->submit(cs, sizeof(*op));
+}
+
 static UINT (* const wined3d_cs_op_handlers[])(struct wined3d_cs *cs, const void *data) =
 {
     /* WINED3D_CS_OP_NOP                        */ wined3d_cs_exec_nop,
@@ -2912,6 +2939,7 @@ static UINT (* const wined3d_cs_op_handlers[])(struct wined3d_cs *cs, const void
     /* WINED3D_CS_OP_RELEASE_DC                 */ wined3d_cs_exec_release_dc,
     /* WINED3D_CS_OP_SAMPLER_DESTROY            */ wined3d_cs_exec_sampler_destroy,
     /* WINED3D_CS_OP_UPDATE_SUB_RESOURCE        */ wined3d_cs_exec_update_sub_resource,
+    /* WINED3D_CS_OP_SRV_DESTROY                */ wined3d_cs_exec_shader_resource_view_destroy,
 };
 
 static inline void *_wined3d_cs_mt_require_space(struct wined3d_cs *cs, size_t size, BOOL prio)

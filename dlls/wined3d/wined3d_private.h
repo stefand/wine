@@ -2943,6 +2943,8 @@ void wined3d_cs_emit_sampler_destroy(struct wined3d_cs *cs, struct wined3d_sampl
 void wined3d_cs_emit_update_sub_resource(struct wined3d_cs *cs, struct wined3d_resource *resource,
         unsigned int sub_resource_idx, const struct wined3d_box *box, const void *data, unsigned int row_pitch,
         unsigned int depth_pitch) DECLSPEC_HIDDEN;
+void wined3d_cs_emit_shader_resource_view_destroy(struct wined3d_cs *cs,
+        struct wined3d_shader_resource_view *view) DECLSPEC_HIDDEN;
 
 /* Direct3D terminology with little modifications. We do not have an issued state
  * because only the driver knows about it, but we have a created state because d3d
@@ -3081,6 +3083,8 @@ struct wined3d_shader_resource_view
     void *parent;
     const struct wined3d_parent_ops *parent_ops;
 };
+
+void wined3d_shader_resource_view_destroy_cs(struct wined3d_shader_resource_view *view) DECLSPEC_HIDDEN;
 
 struct wined3d_swapchain_ops
 {
