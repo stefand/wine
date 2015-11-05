@@ -3088,6 +3088,8 @@ void wined3d_cs_emit_resource_cleanup(struct wined3d_cs *cs,
 void wined3d_cs_emit_buffer_cleanup(struct wined3d_cs *cs, struct wined3d_buffer *buffer) DECLSPEC_HIDDEN;
 void wined3d_cs_emit_texture_cleanup(struct wined3d_cs *cs, struct wined3d_texture *texture) DECLSPEC_HIDDEN;
 void wined3d_cs_emit_sampler_destroy(struct wined3d_cs *cs, struct wined3d_sampler *sampler) DECLSPEC_HIDDEN;
+void wined3d_cs_emit_shader_resource_view_destroy(struct wined3d_cs *cs,
+        struct wined3d_shader_resource_view *view) DECLSPEC_HIDDEN;
 
 static inline void wined3d_cs_push_constants(struct wined3d_cs *cs, enum wined3d_push_constants p,
         unsigned int start_idx, unsigned int count, const void *constants)
@@ -3231,6 +3233,8 @@ struct wined3d_shader_resource_view
     void *parent;
     const struct wined3d_parent_ops *parent_ops;
 };
+
+void wined3d_shader_resource_view_destroy_cs(struct wined3d_shader_resource_view *view) DECLSPEC_HIDDEN;
 
 struct wined3d_swapchain_ops
 {
