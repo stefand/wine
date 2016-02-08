@@ -1144,8 +1144,6 @@ HRESULT CDECL wined3d_device_uninit_3d(struct wined3d_device *device)
 
     wine_rb_clear(&device->samplers, device_free_sampler, NULL);
 
-    /* FIXME: Is this in the right place??? */
-    destroy_dummy_textures(device, gl_info);
     wined3d_cs_emit_delete_opengl_contexts(device->cs, device->swapchains[0]);
 
     if (device->back_buffer_view)
