@@ -2657,6 +2657,7 @@ void wined3d_texture_changed(struct wined3d_texture *texture,
         void *swap_heap_memory) DECLSPEC_HIDDEN;
 BOOL wined3d_texture_check_block_align(const struct wined3d_texture *texture,
         unsigned int level, const struct wined3d_box *box) DECLSPEC_HIDDEN;
+void wined3d_texture_cleanup(struct wined3d_texture *texture) DECLSPEC_HIDDEN;
 GLenum wined3d_texture_get_gl_buffer(const struct wined3d_texture *texture) DECLSPEC_HIDDEN;
 void wined3d_texture_get_memory(struct wined3d_texture *texture, unsigned int sub_resource_idx,
         struct wined3d_bo_address *data, DWORD locations, BOOL map) DECLSPEC_HIDDEN;
@@ -3078,6 +3079,7 @@ void wined3d_cs_emit_create_vbo(struct wined3d_cs *cs, struct wined3d_buffer *bu
 void wined3d_cs_emit_resource_cleanup(struct wined3d_cs *cs,
         struct wined3d_resource *resource) DECLSPEC_HIDDEN;
 void wined3d_cs_emit_buffer_cleanup(struct wined3d_cs *cs, struct wined3d_buffer *buffer) DECLSPEC_HIDDEN;
+void wined3d_cs_emit_texture_cleanup(struct wined3d_cs *cs, struct wined3d_texture *texture) DECLSPEC_HIDDEN;
 
 static inline void wined3d_cs_push_constants(struct wined3d_cs *cs, enum wined3d_push_constants p,
         unsigned int start_idx, unsigned int count, const void *constants)
